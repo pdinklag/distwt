@@ -7,37 +7,33 @@
 #include <thrill/api/print.hpp>
 #include <thrill/api/write_lines.hpp>
 
+#include "thrill_ext/stable_sort.hpp"
+
 using Pair = std::pair<size_t, size_t>;
 
 std::ostream& operator << (std::ostream& os, const Pair& p) {
     return os << '(' << p.first << ',' << p.second << ')';
 }
 
-class SortAlgorithm {
-public:
-    template<typename Iterator, typename CompareFunction>
-    void operator () (Iterator begin, Iterator end, CompareFunction cmp) const {
-        return std::sort(begin, end, cmp);
-    }
-};
-
-void StableSort(
+void Process(
     thrill::Context& ctx, std::string input) {
 
     using Pair = std::pair<size_t, size_t>;
 
-    thrill::ReadLines(ctx, input)
-        .Map([](const std::string& line){
-                const size_t x = line.find(' ');
+    thrill::ext::StableSort(
+        thrill::ReadLines(ctx, input)
+            .Map([](const std::string& line){
+                    const size_t x = line.find(' ');
 
-                const size_t key = std::stoi(line.substr(0,x));
-                const size_t value = std::stoi(line.substr(x+1));
-                return Pair(key, value);
-            })
-        .Sort([](const Pair& a, const Pair& b){
+                    const size_t key = std::stoi(line.substr(0,x));
+                    const size_t value = std::stoi(line.substr(x+1));
+                    return Pair(key, value);
+                }),
+        [](const Pair& a, const Pair& b){
                 return a.first < b.first;
-            }, SortAlgorithm())
-        .Print("sorted");
+        },
+        thrill::ext::DefaultStableSortAlgorithm())
+    .Print("sorted");
 }
 
 int main(int argc, char* argv[]) {
@@ -47,7 +43,7 @@ int main(int argc, char* argv[]) {
     }
 
     return thrill::Run([&](thrill::Context& ctx){
-        StableSort(ctx, argv[1]);
+        Process(ctx, argv[1]);
     });
 }
 
