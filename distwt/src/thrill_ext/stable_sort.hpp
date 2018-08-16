@@ -346,7 +346,7 @@ private:
         LOG << "FindAndSendSplitters() samples.size()=" << samples.size();
 
         // Find splitters
-        std::sort(samples.begin(), samples.end(),
+        std::stable_sort(samples.begin(), samples.end(),
                   [this](
                       const SampleIndexPair& a, const SampleIndexPair& b) {
                       return LessSampleIndex(a, b);
@@ -432,12 +432,12 @@ private:
         size_t actual_k,
         const SampleIndexPair* const sorted_splitters,
         size_t prefix_items,
-        data::MixStreamPtr& data_stream) {
+        data::CatStreamPtr& data_stream) {
 
         data::File::ConsumeReader unsorted_reader =
             unsorted_file_.GetConsumeReader();
 
-        data::MixStream::Writers data_writers = data_stream->GetWriters();
+        data::CatStream::Writers data_writers = data_stream->GetWriters();
 
         // enlarge emitters array to next power of two to have direct access,
         // because we fill the splitter set up with sentinels == last splitter,
@@ -447,7 +447,7 @@ private:
 
         data_writers.reserve(k);
         while (data_writers.size() < k)
-            data_writers.emplace_back(data::MixStream::Writer());
+            data_writers.emplace_back(data::CatStream::Writer());
 
         std::swap(data_writers[actual_k - 1], data_writers[k - 1]);
 
@@ -603,7 +603,7 @@ private:
                     splitters.data(),
                     splitter_count_algo);
 
-        data::MixStreamPtr data_stream = context_.GetNewMixStream(this);
+        data::CatStreamPtr data_stream = context_.GetNewCatStream(this);
 
         std::thread thread;
         if (use_background_thread_) {
@@ -653,9 +653,9 @@ private:
             << "sample_size" << samples_.size();
     }
 
-    void ReceiveItems(data::MixStreamPtr& data_stream) {
+    void ReceiveItems(data::CatStreamPtr& data_stream) {
 
-        auto reader = data_stream->GetMixReader(/* consume */ true);
+        auto reader = data_stream->GetCatReader(/* consume */ true);
 
         LOG0 << "Writing files";
 
