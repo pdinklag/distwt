@@ -9,7 +9,7 @@
 
 #include "thrill_ext/stable_sort.hpp"
 
-using Pair = std::pair<size_t, size_t>;
+using Pair = std::pair<char, size_t>;
 
 std::ostream& operator << (std::ostream& os, const Pair& p) {
     return os << '(' << p.first << ',' << p.second << ')';
@@ -25,9 +25,9 @@ void Process(
             .Map([](const std::string& line){
                     const size_t x = line.find(' ');
 
-                    const size_t key = std::stoi(line.substr(0,x));
-                    const size_t value = std::stoi(line.substr(x+1));
-                    return Pair(key, value);
+                    const char c = line.substr(0,x)[0];
+                    const size_t idx = std::stoi(line.substr(x+1));
+                    return Pair(c, idx);
                 }),
         [](const Pair& a, const Pair& b){
                 return a.first < b.first;
