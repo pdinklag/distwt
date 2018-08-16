@@ -346,7 +346,7 @@ private:
         LOG << "FindAndSendSplitters() samples.size()=" << samples.size();
 
         // Find splitters
-        std::stable_sort(samples.begin(), samples.end(),
+        std::sort(samples.begin(), samples.end(),
                   [this](
                       const SampleIndexPair& a, const SampleIndexPair& b) {
                       return LessSampleIndex(a, b);
