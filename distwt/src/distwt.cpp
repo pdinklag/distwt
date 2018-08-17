@@ -1,6 +1,9 @@
+#include <functional>
 #include <iostream>
 #include <tuple>
 #include <unordered_map>
+
+#include <tlx/math/div_ceil.hpp>
 
 #include <thrill/api/dia.hpp>
 
@@ -25,9 +28,29 @@ std::ostream& operator << (std::ostream& os, const HistEntry& p) {
     return os << p.first << " -> " << p.second;
 }
 
+void ConstructWTNode(size_t id, const thrill::DIA<esym_t>& s, size_t a, size_t b) {
+    const auto m = (a+b)/2;
+    const auto node_name = std::string("node_") + std::to_string(id);
+
+    auto bv = s.Map([&](esym_t x){ return (x > m); });
+    bv.Print(node_name);
+    bv.Collapse();
+
+    if(a != b) {
+        auto left = s.Filter([&](esym_t x){ return (x <= m); }).Cache();
+        ConstructWTNode(2*id, left, a, m);
+        left.Collapse();
+
+        auto right = s.Filter([&](esym_t x){ return (x > m); }).Cache();
+        ConstructWTNode(2*id+1, right, m+1, b);
+        right.Collapse();
+    }
+}
+
 void Process(thrill::Context& ctx, std::string input) {
     // load text
     auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
+    const size_t n = rawtext.Size();
 
     // compute histogram
     auto hist = rawtext
@@ -40,6 +63,8 @@ void Process(thrill::Context& ctx, std::string input) {
         .AllGather();
 
     // compute effective alphabet mapping
+    const size_t sigma = hist.size();
+
     EAMap eamap;
     for(size_t i = 0; i < hist.size(); i++) {
         eamap.emplace(hist[i].first, esym_t(i));
@@ -52,6 +77,9 @@ void Process(thrill::Context& ctx, std::string input) {
 
     // debug
     text.Print("text");
+
+    // construct WT recursively
+    ConstructWTNode(1, text, 0, sigma-1);
 }
 
 int main(int argc, const char** argv) {
