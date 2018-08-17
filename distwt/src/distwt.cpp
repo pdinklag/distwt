@@ -1,37 +1,68 @@
+#include <iostream>
+#include <tuple>
+#include <unordered_map>
+
 #include <thrill/api/dia.hpp>
+
+#include <thrill/api/all_gather.hpp>
 #include <thrill/api/cache.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
+#include <thrill/api/read_binary.hpp>
+#include <thrill/api/reduce_by_key.hpp>
+#include <thrill/api/size.hpp>
+#include <thrill/api/sort.hpp>
+#include <thrill/api/write_lines_one.hpp>
+#include <thrill/api/zip.hpp>
 
-//! A 2-dimensional point with double precision
-struct Point {
-    //! point coordinates
-    double x, y;
-};
+using sym_t = unsigned char;
+using esym_t = unsigned short;
 
-//! make ostream-able for Print()
-std::ostream& operator << (std::ostream& os, const Point& p) {
-    return os << '(' << p.x << ',' << p.y << ')';
+using HistEntry = std::pair<sym_t, size_t>;
+using EAMap = std::unordered_map<sym_t, esym_t>;
+
+std::ostream& operator << (std::ostream& os, const HistEntry& p) {
+    return os << p.first << " -> " << p.second;
 }
 
-void Process(thrill::Context& ctx) {
-    std::default_random_engine rng(std::random_device { } ());
-    std::uniform_real_distribution<double> dist(0.0, 1000.0);
-    // generate 100 random points using uniform distribution
-    thrill::DIA<Point> points =
-        thrill::api::Generate(
-            ctx, /* size */ 100,
-            [&](const size_t& /* index */) {
-                return Point { dist(rng), dist(rng) };
-            })
-        .Cache();
-    // print out the points
-    points.Print("points");
+void Process(thrill::Context& ctx, std::string input) {
+    // load text
+    auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
+
+    // compute histogram
+    auto hist = rawtext
+        .Map([](sym_t x){ return HistEntry(x, 1); })
+        .ReduceByKey(
+            [](const HistEntry& e){ return e.first; }, // key extractor
+            [](const HistEntry& a, const HistEntry& b){ return HistEntry(a.first, a.second+b.second); } // reduce
+        )
+        .Sort([](const HistEntry& a, const HistEntry& b){ return a.first < b.first; })
+        .AllGather();
+
+    // compute effective alphabet mapping
+    EAMap eamap;
+    for(size_t i = 0; i < hist.size(); i++) {
+        eamap.emplace(hist[i].first, esym_t(i));
+    }
+
+    // transform text using effective alphabet
+    auto text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Cache();
+
+    // TODO: rawtext is no longer needed from here!
+
+    // debug
+    text.Print("text");
 }
 
 int main(int argc, const char** argv) {
+    if (argc < 2) {
+        std::cout << "Usage: " << argv[0] << " <input>" << std::endl;
+        return -1;
+    }
+
     // launch Thrill program: the lambda function will be run on each worker.
-    return thrill::Run(
-        [&](thrill::Context& ctx) { Process(ctx); });
+    return thrill::Run([&](thrill::Context& ctx) {
+        Process(ctx, argv[1]);
+    });
 }
 
