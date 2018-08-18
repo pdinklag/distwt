@@ -31,32 +31,38 @@ std::ostream& operator << (std::ostream& os, const HistEntry& p) {
 }
 
 void Process(thrill::Context& ctx, std::string input) {
-    // load text
-    auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
-    const size_t n = rawtext.Size();
 
-    // compute histogram
-    auto hist = rawtext
-        .Map([](sym_t x){ return HistEntry(x, 1); })
-        .ReduceByKey(
-            [](const HistEntry& e){ return e.first; }, // key extractor
-            [](const HistEntry& a, const HistEntry& b){ return HistEntry(a.first, a.second+b.second); } // reduce
-        )
-        .Sort([](const HistEntry& a, const HistEntry& b){ return a.first < b.first; })
-        .AllGather();
+    size_t sigma; // alphabet size
+    thrill::DIA<esym_t> text; // text transformed to effective alphabet
 
-    // compute effective alphabet mapping
-    const size_t sigma = hist.size();
+    //{ // -- TODO: why can this NOT be inside an isolated block? how do I discard rawtext once no longer needed?
+        // load raw text
+        auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
 
-    EAMap eamap;
-    for(size_t i = 0; i < hist.size(); i++) {
-        eamap.emplace(hist[i].first, esym_t(i));
-    }
+        // compute histogram
+        auto hist = rawtext
+            .Map([](sym_t x){ return HistEntry(x, 1); })
+            .ReduceByKey(
+                [](const HistEntry& e){ return e.first; }, // key extractor
+                [](const HistEntry& a, const HistEntry& b){ return HistEntry(a.first, a.second+b.second); } // reduce
+            )
+            .Sort([](const HistEntry& a, const HistEntry& b){ return a.first < b.first; })
+            .AllGather();
 
-    // transform text using effective alphabet
-    auto text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Cache();
+        // read alphabet size
+        sigma = hist.size();
 
-    // TODO: rawtext is no longer needed from here!
+        // compute effective alphabet mapping
+        EAMap eamap;
+        for(size_t i = 0; i < hist.size(); i++) {
+            eamap.emplace(hist[i].first, esym_t(i));
+        }
+
+        // TODO: output eamap to file?
+
+        // transform text using effective alphabet
+        text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Cache();
+    //}
 
     // debug
     text.Print("transformed_text");
@@ -77,22 +83,23 @@ void Process(thrill::Context& ctx, std::string input) {
             return bool((x >> rsh) & 1);
         });
 
-        // output
-        // TODO: output to file
+        // debug
         bv.Print(std::string("bv_") + std::to_string(level));
+
+        // TODO: output to file and discard
 
         if(level+1 < wt_height) {
             // re-order text
-            text = thrill::ext::StableSort(text,
+            auto reordered_text = thrill::ext::StableSort(text,
                 [&](esym_t a, esym_t b){
                     return (a >> rsh) < (b >> rsh);
-                })
-            .Cache();
-
-            // TODO: free text from previous level?
+                });
 
             // debug
-            text.Print(std::string("text_") + std::to_string(level+1));
+            reordered_text.Print(std::string("text_") + std::to_string(level+1));
+
+            // collapse
+            text = reordered_text.Collapse();
         }
     }
 }
