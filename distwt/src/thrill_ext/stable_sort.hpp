@@ -770,5 +770,13 @@ inline auto StableSort(
     return DIA<ValueType>(node);
 }
 
+template<typename ValueType, typename Stack, typename CompareFunction>
+inline auto StableSort(
+        const DIA<ValueType, Stack>& dia,
+        const CompareFunction& compare_function) {
+
+    return StableSort(dia, compare_function, DefaultStableSortAlgorithm());
+}
+
 }} //namespace
 

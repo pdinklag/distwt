@@ -3,7 +3,7 @@
 #include <tuple>
 #include <unordered_map>
 
-#include <tlx/math/div_ceil.hpp>
+#include <tlx/math/integer_log2.hpp>
 
 #include <thrill/api/dia.hpp>
 
@@ -18,6 +18,8 @@
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
 
+#include "thrill_ext/stable_sort.hpp"
+
 using sym_t = unsigned char;
 using esym_t = unsigned short;
 
@@ -26,25 +28,6 @@ using EAMap = std::unordered_map<sym_t, esym_t>;
 
 std::ostream& operator << (std::ostream& os, const HistEntry& p) {
     return os << p.first << " -> " << p.second;
-}
-
-void ConstructWTNode(size_t id, const thrill::DIA<esym_t>& s, size_t a, size_t b) {
-    const auto m = (a+b)/2;
-    const auto node_name = std::string("node_") + std::to_string(id);
-
-    auto bv = s.Map([&](esym_t x){ return (x > m); });
-    bv.Print(node_name);
-    bv.Collapse();
-
-    if(a != b) {
-        auto left = s.Filter([&](esym_t x){ return (x <= m); }).Cache();
-        ConstructWTNode(2*id, left, a, m);
-        left.Collapse();
-
-        auto right = s.Filter([&](esym_t x){ return (x > m); }).Cache();
-        ConstructWTNode(2*id+1, right, m+1, b);
-        right.Collapse();
-    }
 }
 
 void Process(thrill::Context& ctx, std::string input) {
@@ -76,10 +59,42 @@ void Process(thrill::Context& ctx, std::string input) {
     // TODO: rawtext is no longer needed from here!
 
     // debug
-    text.Print("text");
+    text.Print("transformed_text");
 
-    // construct WT recursively
-    ConstructWTNode(1, text, 0, sigma-1);
+    // compute height of WT
+    const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
+    if(ctx.my_rank() == 0) {
+        std::cout << "wt_height = " << wt_height << std::endl;
+    }
+
+    // construct WT level by level using stable sorting approach
+    for(size_t level = 0; level < wt_height; level++) {
+        const size_t rsh = wt_height - 1 - level;
+
+        // compute BV
+        auto bv = text.Map([&](esym_t x) {
+            // get level-th bit of symbol
+            return bool((x >> rsh) & 1);
+        });
+
+        // output
+        // TODO: output to file
+        bv.Print(std::string("bv_") + std::to_string(level));
+
+        if(level+1 < wt_height) {
+            // re-order text
+            text = thrill::ext::StableSort(text,
+                [&](esym_t a, esym_t b){
+                    return (a >> rsh) < (b >> rsh);
+                })
+            .Cache();
+
+            // TODO: free text from previous level?
+
+            // debug
+            text.Print(std::string("text_") + std::to_string(level+1));
+        }
+    }
 }
 
 int main(int argc, const char** argv) {
