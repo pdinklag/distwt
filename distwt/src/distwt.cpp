@@ -18,8 +18,6 @@
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
 
-#include "thrill_ext/stable_sort.hpp"
-
 using sym_t = unsigned char;
 using esym_t = unsigned short;
 
@@ -90,13 +88,13 @@ void Process(thrill::Context& ctx, std::string input) {
 
         if(level+1 < wt_height) {
             // re-order text
-            auto reordered_text = thrill::ext::StableSort(text,
+            auto reordered_text = text.SortStable(
                 [&](esym_t a, esym_t b){
                     return (a >> rsh) < (b >> rsh);
                 });
 
             // debug
-            reordered_text.Print(std::string("text_") + std::to_string(level+1));
+            //reordered_text.Print(std::string("text_") + std::to_string(level+1));
 
             // collapse
             text = reordered_text.Collapse();
