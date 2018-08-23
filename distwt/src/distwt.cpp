@@ -30,46 +30,35 @@ std::ostream& operator << (std::ostream& os, const HistEntry& p) {
 
 void Process(thrill::Context& ctx, std::string input) {
 
-    size_t sigma; // alphabet size
-    thrill::DIA<esym_t> text; // text transformed to effective alphabet
+    // load raw text
+    auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
 
-    //{ // -- TODO: why can this NOT be inside an isolated block? how do I discard rawtext once no longer needed?
-        // load raw text
-        auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
+    // compute histogram
+    auto hist = rawtext
+        .Map([](sym_t x){ return HistEntry(x, 1); })
+        .ReduceByKey(
+            [](const HistEntry& e){ return e.first; }, // key extractor
+            [](const HistEntry& a, const HistEntry& b){ return HistEntry(a.first, a.second+b.second); } // reduce
+        )
+        .Sort([](const HistEntry& a, const HistEntry& b){ return a.first < b.first; })
+        .AllGather();
 
-        // compute histogram
-        auto hist = rawtext
-            .Map([](sym_t x){ return HistEntry(x, 1); })
-            .ReduceByKey(
-                [](const HistEntry& e){ return e.first; }, // key extractor
-                [](const HistEntry& a, const HistEntry& b){ return HistEntry(a.first, a.second+b.second); } // reduce
-            )
-            .Sort([](const HistEntry& a, const HistEntry& b){ return a.first < b.first; })
-            .AllGather();
+    // read alphabet size
+    const size_t sigma = hist.size();
 
-        // read alphabet size
-        sigma = hist.size();
+    // compute effective alphabet mapping
+    EAMap eamap;
+    for(size_t i = 0; i < hist.size(); i++) {
+        eamap.emplace(hist[i].first, esym_t(i));
+    }
 
-        // compute effective alphabet mapping
-        EAMap eamap;
-        for(size_t i = 0; i < hist.size(); i++) {
-            eamap.emplace(hist[i].first, esym_t(i));
-        }
+    // TODO: output eamap to file?
 
-        // TODO: output eamap to file?
-
-        // transform text using effective alphabet
-        text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Cache();
-    //}
-
-    // debug
-    text.Print("transformed_text");
+    // transform text using effective alphabet
+    auto text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Cache();
 
     // compute height of WT
     const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
-    if(ctx.my_rank() == 0) {
-        std::cout << "wt_height = " << wt_height << std::endl;
-    }
 
     // construct WT level by level using stable sorting approach
     for(size_t level = 0; level < wt_height; level++) {
@@ -80,23 +69,15 @@ void Process(thrill::Context& ctx, std::string input) {
             // get level-th bit of symbol
             return bool((x >> rsh) & 1);
         });
-
-        // debug
         bv.Print(std::string("bv_") + std::to_string(level));
 
-        // TODO: output to file and discard
-
         if(level+1 < wt_height) {
-            // re-order text
             auto reordered_text = text.SortStable(
                 [&](esym_t a, esym_t b){
                     return (a >> rsh) < (b >> rsh);
                 });
 
-            // debug
-            //reordered_text.Print(std::string("text_") + std::to_string(level+1));
-
-            // collapse
+            reordered_text.Print(std::string("text_") + std::to_string(level+1));
             text = reordered_text.Collapse();
         }
     }
