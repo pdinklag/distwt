@@ -28,6 +28,43 @@ std::ostream& operator << (std::ostream& os, const HistEntry& p) {
     return os << p.first << " -> " << p.second;
 }
 
+template<typename InputDIA>
+std::vector<thrill::DIA<bool>> ConstructWT_StableSort(
+    const InputDIA& input, const size_t sigma) {
+
+    // compute size of WT
+    const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
+
+    // construct WT level by level using stable sorting approach
+    auto text = input.Collapse();
+    std::vector<thrill::DIA<bool>> wt;
+
+    for(size_t level = 0; level < wt_height; level++) {
+        const size_t rsh = wt_height - 1 - level;
+
+        // compute BV
+        auto bv = text
+            .Map([&](esym_t x) {
+                // get level-th bit of symbol
+                return bool((x >> rsh) & 1);
+            });
+
+        wt.push_back(bv.Cache()); // TODO: why does it ONLY work with Cache? (but not with Collapse, Execute, Keep, ...)
+
+        if(level+1 < wt_height) {
+            text = text
+                .SortStable(
+                    [&](esym_t a, esym_t b){
+                        return (a >> rsh) < (b >> rsh);
+                    })
+                .Execute() // do it NOW
+                .Collapse();
+        }
+    }
+
+    return wt;
+}
+
 void Process(thrill::Context& ctx, std::string input) {
 
     // load raw text
@@ -55,31 +92,14 @@ void Process(thrill::Context& ctx, std::string input) {
     // TODO: output eamap to file?
 
     // transform text using effective alphabet
-    auto text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Cache();
+    auto text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Execute();
 
-    // compute height of WT
-    const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
+    // construct wt
+    auto wt = ConstructWT_StableSort(text, sigma);
 
-    // construct WT level by level using stable sorting approach
-    for(size_t level = 0; level < wt_height; level++) {
-        const size_t rsh = wt_height - 1 - level;
-
-        // compute BV
-        auto bv = text.Map([&](esym_t x) {
-            // get level-th bit of symbol
-            return bool((x >> rsh) & 1);
-        });
-        bv.Print(std::string("bv_") + std::to_string(level));
-
-        if(level+1 < wt_height) {
-            auto reordered_text = text.SortStable(
-                [&](esym_t a, esym_t b){
-                    return (a >> rsh) < (b >> rsh);
-                });
-
-            reordered_text.Print(std::string("text_") + std::to_string(level+1));
-            text = reordered_text.Collapse();
-        }
+    // print WT
+    for(size_t i = 0; i < wt.size(); i++) {
+        wt[i].Print(std::string("wt_") + std::to_string(i+1));
     }
 }
 
