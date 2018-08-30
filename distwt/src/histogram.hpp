@@ -1,10 +1,7 @@
 #pragma once
 
 #include "def.hpp"
-
-#include <thrill/api/all_gather.hpp>
-#include <thrill/api/reduce_by_key.hpp>
-#include <thrill/api/sort.hpp>
+#include <tuple>
 
 // histogram entry
 // symbol and number of occurences

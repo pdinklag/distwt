@@ -1,5 +1,9 @@
 #include "histogram.hpp"
 
+#include <thrill/api/all_gather.hpp>
+#include <thrill/api/reduce_by_key.hpp>
+#include <thrill/api/sort.hpp>
+
 hist_t compute_histogram(const rawtext_t& rawtext) {
     return rawtext
         .Map([](rawsym_t x){

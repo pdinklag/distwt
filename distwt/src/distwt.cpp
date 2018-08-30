@@ -1,7 +1,5 @@
-#include <functional>
 #include <iostream>
 #include <tuple>
-#include <unordered_map>
 
 #include <tlx/math/integer_log2.hpp>
 
@@ -19,75 +17,9 @@
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
 
-#include <unistd.h>
-
 #include "def.hpp"
 #include "histogram.hpp"
-
-// type used for effective alphabet indices
-using ea_index_t = unsigned char;
-
-// an effective alphabet entry, ie, an index within an effective alphabet
-struct esym_t {
-private:
-    ea_index_t m_idx;
-
-public:
-    inline esym_t() {
-    }
-
-    inline esym_t(ea_index_t idx) : m_idx(idx) {
-    }
-
-    inline esym_t(const esym_t& x) : m_idx(x.m_idx) {
-    }
-
-    inline esym_t(esym_t&& x) : m_idx(x.m_idx) {
-    }
-
-    inline operator ea_index_t() const {
-        return m_idx;
-    }
-
-    esym_t& operator =(const esym_t& x) {
-        m_idx = x.m_idx;
-        return *this;
-    }
-
-    esym_t& operator =(ea_index_t idx) {
-        m_idx = idx;
-        return *this;
-    }
-
-    bool operator <(const esym_t& x) const {
-        return m_idx < x.m_idx;
-    }
-
-    const ea_index_t& index = m_idx;
-};
-
-// stream output for esym_t
-std::ostream& operator<<(std::ostream& os, const esym_t& x) {
-    os << size_t(x.index);
-    return os;
-}
-
-// serialization for esym_t
-template<typename Archive>
-struct thrill::data::Serialization<Archive, esym_t>{
-    static void Serialize(const esym_t& x, Archive& ar) {
-        ar.PutRaw(x.index);
-    }
-    static esym_t Deserialize(Archive& ar) {
-        return esym_t(ar.template GetRaw<ea_index_t>());
-    }
-    static constexpr bool   is_fixed_size = true;
-    static constexpr size_t fixed_size    = sizeof(ea_index_t);
-};
-
-// effective alphabet (ea) mapping
-// maps a symbol to its effective counterpart, ie, index in the ea
-using ea_map_t = std::unordered_map<rawsym_t, esym_t>;
+#include "effective_alphabet.hpp"
 
 // DIA type used for distributed bit vectors
 using bv_dia_t = thrill::DIA<bool>;
@@ -95,17 +27,18 @@ using bv_dia_t = thrill::DIA<bool>;
 // storage for a wavelet tree's bit vector
 using wt_bits_t = std::vector<bv_dia_t>;
 
-template<typename InputDIA>
-wt_bits_t ConstructWT_StableSort(const InputDIA& input, const size_t sigma) {
+wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
 
     // compute size of WT
     const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
 
     // construct WT level by level using stable sorting approach
-    auto text = input.Collapse();
+    auto text = input;
     wt_bits_t wt_bits;
 
     for(size_t level = 0; level < wt_height; level++) {
+        //text.Print(std::string("text_") + std::to_string(level+1));
+
         const size_t rsh = wt_height - 1 - level;
 
         // compute BV
@@ -114,8 +47,8 @@ wt_bits_t ConstructWT_StableSort(const InputDIA& input, const size_t sigma) {
                 // get level-th bit of symbol
                 return bool((x >> rsh) & 1);
             });
-
-        wt_bits.push_back(bv.Cache()); // TODO: why does it ONLY work with Cache? (but not with Collapse, Execute, Keep, ...)
+        bv.Print(std::string("bv_") + std::to_string(level+1));
+        wt_bits.push_back(bv.Cache()); // FIXME: this doesn't work as intended...
 
         if(level+1 < wt_height) {
             text = text
@@ -203,28 +136,21 @@ void Process(thrill::Context& ctx, std::string input) {
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
 
     // compute histogram
-    hist_t hist = compute_histogram(rawtext);
-
-    for(auto e : hist); // FIXME: everything breaks if I remove this ... ???
+    auto hist = compute_histogram(rawtext);
 
     // compute effective alphabet mapping
-    ea_map_t eamap;
-    for(size_t i = 0; i < hist.size(); i++) {
-        eamap.emplace(hist[i].first, esym_t(i));
-    }
-
-    // TODO: output eamap to file?
+    auto eamap = compute_ea_map(hist);
 
     // transform text using effective alphabet
-    auto text = rawtext.Map([&](rawsym_t x){ return eamap[x]; }).Execute();
+    auto etext = compute_effective_transformation(rawtext, eamap);
 
     // construct wt
     const size_t sigma = hist.size();
-    auto wt_bits = ConstructWT_StableSort(text, sigma);
+    auto wt_bits = ConstructWT_StableSort(etext, sigma);
 
     // print WT
     for(size_t i = 0; i < wt_bits.size(); i++) {
-        wt_bits[i].Print(std::string("wt_bits") + std::to_string(i+1));
+        wt_bits[i].Print(std::string("wt_bits_") + std::to_string(i+1));
     }
 
     // decode WT

@@ -8,6 +8,8 @@ set(THRILL_DEPENDENCIES
 add_executable(distwt
 
     distwt.cpp
-    histogram.cpp)
+    histogram.cpp
+    effective_alphabet.cpp
+)
 
 target_link_libraries(distwt ${THRILL_DEPENDENCIES})
