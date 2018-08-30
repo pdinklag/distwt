@@ -106,13 +106,9 @@ thrill::DIA<rawsym_t> DecodeWT(
             // stably sort back by original index
             return a.second < b.second;
         })
-        .Map([](esym_index_t x){
-            // map indexed pair back to effective symbol
-            return x.first;
-        })
-        .Map([hist](esym_t x){
-            // undo effective transformation using histogram
-            return hist[x].first;
+        .Map([hist](esym_index_t x){
+            // undo effective transformation
+            return hist[x.first].first;
         });
 
     return text.Cache();
