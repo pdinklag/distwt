@@ -19,8 +19,10 @@
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
 
-// a raw input symbol
-using rawsym_t = unsigned char;
+#include <unistd.h>
+
+#include "def.hpp"
+#include "histogram.hpp"
 
 // type used for effective alphabet indices
 using ea_index_t = unsigned char;
@@ -82,19 +84,6 @@ struct thrill::data::Serialization<Archive, esym_t>{
     static constexpr bool   is_fixed_size = true;
     static constexpr size_t fixed_size    = sizeof(ea_index_t);
 };
-
-// histogram entry
-// symbol and number of occurences
-using hist_entry_t = std::pair<rawsym_t, size_t>;
-
-// stream output for hist_entry_t
-std::ostream& operator << (std::ostream& os, const hist_entry_t& p) {
-    return os << p.first << " -> " << p.second;
-}
-
-// histogram
-// vector of lexicographically ordered entries
-using hist_t = std::vector<hist_entry_t>;
 
 // effective alphabet (ea) mapping
 // maps a symbol to its effective counterpart, ie, index in the ea
@@ -214,29 +203,9 @@ void Process(thrill::Context& ctx, std::string input) {
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
 
     // compute histogram
-    auto hist = rawtext
-        .Map([](rawsym_t x){
-            // map each symbol to an occurence counter
-            return hist_entry_t(x, 1);
-        })
-        .ReduceByKey(
-            [](const hist_entry_t& e){
-                // use symbol value as extraction key
-                return e.first;
-            },
-            [](const hist_entry_t& a, const hist_entry_t& b){
-                // reduce by summing up occurences
-                return hist_entry_t(a.first, a.second+b.second);
-            }
-        )
-        .Sort([](const hist_entry_t& a, const hist_entry_t& b){
-            // sort lexicographically
-            return a.first < b.first;
-        })
-        .AllGather();
+    hist_t hist = compute_histogram(rawtext);
 
-    // read alphabet size
-    const size_t sigma = hist.size();
+    for(auto e : hist); // FIXME: everything breaks if I remove this ... ???
 
     // compute effective alphabet mapping
     ea_map_t eamap;
@@ -250,6 +219,7 @@ void Process(thrill::Context& ctx, std::string input) {
     auto text = rawtext.Map([&](rawsym_t x){ return eamap[x]; }).Execute();
 
     // construct wt
+    const size_t sigma = hist.size();
     auto wt_bits = ConstructWT_StableSort(text, sigma);
 
     // print WT
