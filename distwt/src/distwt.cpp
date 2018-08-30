@@ -37,19 +37,23 @@ wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
     auto text = input;
     wt_bits_t wt_bits;
 
+    bv_dia_t bv;
     for(size_t level = 0; level < wt_height; level++) {
         //text.Print(std::string("text_") + std::to_string(level+1));
 
         const size_t rsh = wt_height - 1 - level;
 
         // compute BV
-        auto bv = text
+        bv = text
             .Map([&](esym_t x) {
                 // get level-th bit of symbol
                 return bool((x >> rsh) & 1);
-            });
-        bv.Print(std::string("bv_") + std::to_string(level+1));
-        wt_bits.push_back(bv.Cache()); // FIXME: this doesn't work as intended...
+            })
+            .Cache()
+            .Execute(); // TODO: why is this required?
+
+        //bv.Print(std::string("bv_") + std::to_string(level+1));
+        wt_bits.emplace_back(bv);
 
         if(level+1 < wt_height) {
             text = text
@@ -58,11 +62,10 @@ wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
                         // stably sort according to newest bit
                         return (a >> rsh) < (b >> rsh);
                     })
-                .Execute() // do it NOW
+                .Execute() // NOW!
                 .Collapse();
         }
     }
-
     return wt_bits;
 }
 
@@ -134,9 +137,9 @@ void Process(thrill::Context& ctx, std::string input) {
     auto wt_bits = ConstructWT_StableSort(etext, sigma);
 
     // print WT
-    for(size_t i = 0; i < wt_bits.size(); i++) {
+    /*for(size_t i = 0; i < wt_bits.size(); i++) {
         wt_bits[i].Print(std::string("wt_bits_") + std::to_string(i+1));
-    }
+    }*/
 
     // decode WT
     auto decoded = DecodeWT(ctx, wt_bits, hist);
