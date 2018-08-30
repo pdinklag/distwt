@@ -19,27 +19,102 @@
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
 
-using sym_t = unsigned char;
-using esym_t = unsigned short;
+// a raw input symbol
+using rawsym_t = unsigned char;
 
-using HistEntry = std::pair<sym_t, size_t>;
-using EAMap = std::unordered_map<sym_t, esym_t>;
+// type used for effective alphabet indices
+using ea_index_t = unsigned char;
 
-using wt_t = std::vector<thrill::DIA<bool>>;
+// an effective alphabet entry, ie, an index within an effective alphabet
+struct esym_t {
+private:
+    ea_index_t m_idx;
 
-std::ostream& operator << (std::ostream& os, const HistEntry& p) {
+public:
+    inline esym_t() {
+    }
+
+    inline esym_t(ea_index_t idx) : m_idx(idx) {
+    }
+
+    inline esym_t(const esym_t& x) : m_idx(x.m_idx) {
+    }
+
+    inline esym_t(esym_t&& x) : m_idx(x.m_idx) {
+    }
+
+    inline operator ea_index_t() const {
+        return m_idx;
+    }
+
+    esym_t& operator =(const esym_t& x) {
+        m_idx = x.m_idx;
+        return *this;
+    }
+
+    esym_t& operator =(ea_index_t idx) {
+        m_idx = idx;
+        return *this;
+    }
+
+    bool operator <(const esym_t& x) const {
+        return m_idx < x.m_idx;
+    }
+
+    const ea_index_t& index = m_idx;
+};
+
+// stream output for esym_t
+std::ostream& operator<<(std::ostream& os, const esym_t& x) {
+    os << size_t(x.index);
+    return os;
+}
+
+// serialization for esym_t
+template<typename Archive>
+struct thrill::data::Serialization<Archive, esym_t>{
+    static void Serialize(const esym_t& x, Archive& ar) {
+        ar.PutRaw(x.index);
+    }
+    static esym_t Deserialize(Archive& ar) {
+        return esym_t(ar.template GetRaw<ea_index_t>());
+    }
+    static constexpr bool   is_fixed_size = true;
+    static constexpr size_t fixed_size    = sizeof(ea_index_t);
+};
+
+// histogram entry
+// symbol and number of occurences
+using hist_entry_t = std::pair<rawsym_t, size_t>;
+
+// stream output for hist_entry_t
+std::ostream& operator << (std::ostream& os, const hist_entry_t& p) {
     return os << p.first << " -> " << p.second;
 }
 
+// histogram
+// vector of lexicographically ordered entries
+using hist_t = std::vector<hist_entry_t>;
+
+// effective alphabet (ea) mapping
+// maps a symbol to its effective counterpart, ie, index in the ea
+using ea_map_t = std::unordered_map<rawsym_t, esym_t>;
+
+// DIA type used for distributed bit vectors
+using bv_dia_t = thrill::DIA<bool>;
+
+// storage for a wavelet tree's bit vector
+using wt_bits_t = std::vector<bv_dia_t>;
+
 template<typename InputDIA>
-wt_t ConstructWT_StableSort(const InputDIA& input, const size_t sigma) {
+wt_bits_t ConstructWT_StableSort(const InputDIA& input, const size_t sigma) {
 
     // compute size of WT
     const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
 
     // construct WT level by level using stable sorting approach
     auto text = input.Collapse();
-    std::vector<thrill::DIA<bool>> wt;
+    wt_bits_t wt_bits;
 
     for(size_t level = 0; level < wt_height; level++) {
         const size_t rsh = wt_height - 1 - level;
@@ -51,7 +126,7 @@ wt_t ConstructWT_StableSort(const InputDIA& input, const size_t sigma) {
                 return bool((x >> rsh) & 1);
             });
 
-        wt.push_back(bv.Cache()); // TODO: why does it ONLY work with Cache? (but not with Collapse, Execute, Keep, ...)
+        wt_bits.push_back(bv.Cache()); // TODO: why does it ONLY work with Cache? (but not with Collapse, Execute, Keep, ...)
 
         if(level+1 < wt_height) {
             text = text
@@ -65,28 +140,28 @@ wt_t ConstructWT_StableSort(const InputDIA& input, const size_t sigma) {
         }
     }
 
-    return wt;
+    return wt_bits;
 }
 
-thrill::DIA<sym_t> DecodeWT(
+thrill::DIA<rawsym_t> DecodeWT(
     thrill::Context& ctx,
-    const wt_t& wt,
-    const std::vector<HistEntry>& hist) {
+    const wt_bits_t& wt_bits,
+    const hist_t& hist) {
 
     using esym_index_t = std::pair<esym_t, size_t>;
 
     // reconstruct symbols from bit vector
-    const size_t n = wt[0].Size();
+    const size_t n = wt_bits[0].Size();
     auto xtext = thrill::api::Generate(ctx, n, [](size_t i){
         // construct indexed sequence of 0 symbols
         return esym_index_t(0, i);}
     );
 
-    const size_t wt_height = wt.size();
+    const size_t wt_height = wt_bits.size();
     for(size_t level = 0; level < wt_height; level++) {
         const size_t lsh = wt_height - 1 - level;
 
-        xtext = wt[level]
+        xtext = wt_bits[level]
             .Zip(xtext, [lsh](bool bit, esym_index_t x) {
                 // OR symbols using current vector
                 return esym_index_t(x.first | (bit << lsh), x.second);
@@ -136,23 +211,35 @@ size_t Compare(
 void Process(thrill::Context& ctx, std::string input) {
 
     // load raw text
-    auto rawtext = thrill::api::ReadBinary<sym_t>(ctx, input).Cache();
+    auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
 
     // compute histogram
     auto hist = rawtext
-        .Map([](sym_t x){ return HistEntry(x, 1); })
+        .Map([](rawsym_t x){
+            // map each symbol to an occurence counter
+            return hist_entry_t(x, 1);
+        })
         .ReduceByKey(
-            [](const HistEntry& e){ return e.first; }, // key extractor
-            [](const HistEntry& a, const HistEntry& b){ return HistEntry(a.first, a.second+b.second); } // reduce
+            [](const hist_entry_t& e){
+                // use symbol value as extraction key
+                return e.first;
+            },
+            [](const hist_entry_t& a, const hist_entry_t& b){
+                // reduce by summing up occurences
+                return hist_entry_t(a.first, a.second+b.second);
+            }
         )
-        .Sort([](const HistEntry& a, const HistEntry& b){ return a.first < b.first; })
+        .Sort([](const hist_entry_t& a, const hist_entry_t& b){
+            // sort lexicographically
+            return a.first < b.first;
+        })
         .AllGather();
 
     // read alphabet size
     const size_t sigma = hist.size();
 
     // compute effective alphabet mapping
-    EAMap eamap;
+    ea_map_t eamap;
     for(size_t i = 0; i < hist.size(); i++) {
         eamap.emplace(hist[i].first, esym_t(i));
     }
@@ -160,18 +247,18 @@ void Process(thrill::Context& ctx, std::string input) {
     // TODO: output eamap to file?
 
     // transform text using effective alphabet
-    auto text = rawtext.Map([&](sym_t x){ return eamap[x]; }).Execute();
+    auto text = rawtext.Map([&](rawsym_t x){ return eamap[x]; }).Execute();
 
     // construct wt
-    auto wt = ConstructWT_StableSort(text, sigma);
+    auto wt_bits = ConstructWT_StableSort(text, sigma);
 
     // print WT
-    for(size_t i = 0; i < wt.size(); i++) {
-        wt[i].Print(std::string("wt_") + std::to_string(i+1));
+    for(size_t i = 0; i < wt_bits.size(); i++) {
+        wt_bits[i].Print(std::string("wt_bits") + std::to_string(i+1));
     }
 
     // decode WT
-    auto decoded = DecodeWT(ctx, wt, hist);
+    auto decoded = DecodeWT(ctx, wt_bits, hist);
 
     // compare raw and decoded texts as a means to verify the WT
     const size_t diff = Compare(rawtext, decoded);
