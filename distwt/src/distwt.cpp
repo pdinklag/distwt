@@ -20,6 +20,7 @@
 #include "def.hpp"
 #include "histogram.hpp"
 #include "effective_alphabet.hpp"
+#include "dia_compare.hpp"
 
 // DIA type used for distributed bit vectors
 using bv_dia_t = thrill::DIA<bool>;
@@ -114,22 +115,6 @@ thrill::DIA<rawsym_t> DecodeWT(
     return text.Cache();
 }
 
-template<typename ValueType>
-size_t Compare(
-    const thrill::DIA<ValueType>& a,
-    const thrill::DIA<ValueType>& b) {
-
-    return a
-        .Zip(b, [](const ValueType& a, const ValueType& b){
-            // test if single items are equal
-            return (a != b) ? 1ULL : 0ULL;
-        })
-        .Sum([](size_t a, size_t b){
-            // sum up amount of differing items (diff)
-            return a + b;
-        }, 0ULL);
-}
-
 void Process(thrill::Context& ctx, std::string input) {
 
     // load raw text
@@ -157,7 +142,7 @@ void Process(thrill::Context& ctx, std::string input) {
     auto decoded = DecodeWT(ctx, wt_bits, hist);
 
     // compare raw and decoded texts as a means to verify the WT
-    const size_t diff = Compare(rawtext, decoded);
+    const size_t diff = dia_compare(rawtext, decoded);
 
     // output result on first worker
     if(ctx.my_rank() == 0) {
