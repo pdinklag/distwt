@@ -102,8 +102,8 @@ thrill::DIA<rawsym_t> DecodeWT(
 
     // restore original text
     auto text = xtext
-        .SortStable([](esym_index_t a, esym_index_t b){
-            // stably sort back by original index
+        .Sort([](esym_index_t a, esym_index_t b){
+            // sort back by original index
             return a.second < b.second;
         })
         .Map([hist](esym_index_t x){
