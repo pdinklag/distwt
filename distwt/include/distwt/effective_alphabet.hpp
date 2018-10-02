@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 
-#include <distwt/def.hpp>
+#include <distwt/text.hpp>
 #include <distwt/histogram.hpp>
 
 // type used for effective alphabet indices
