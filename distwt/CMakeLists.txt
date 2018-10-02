@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8.2 FATAL_ERROR)
 project(distwt)
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmakemodules") 
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmakemodules")
 
 set(CXX_STANDARD c++14)
 
@@ -16,6 +16,6 @@ find_package(Thrill)
 
 include_directories(${TLX_INCLUDE_DIRS})
 include_directories(${THRILL_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_subdirectory(src)
-

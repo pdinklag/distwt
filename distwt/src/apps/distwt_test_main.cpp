@@ -17,10 +17,10 @@
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
 
-#include "def.hpp"
-#include "histogram.hpp"
-#include "effective_alphabet.hpp"
-#include "dia_compare.hpp"
+#include <distwt/def.hpp>
+#include <distwt/histogram.hpp>
+#include <distwt/effective_alphabet.hpp>
+#include <distwt/dia_compare.hpp>
 
 // DIA type used for distributed bit vectors
 using bv_dia_t = thrill::DIA<bool>;

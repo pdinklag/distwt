@@ -1,4 +1,4 @@
-#include "effective_alphabet.hpp"
+#include <distwt/effective_alphabet.hpp>
 
 #include <thrill/api/collapse.hpp>
 

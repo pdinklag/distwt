@@ -5,11 +5,11 @@ set(THRILL_DEPENDENCIES
     ${CMAKE_THREAD_LIBS_INIT}
     ${CMAKE_DL_LIBS})
 
-add_executable(distwt
+add_library(distwt
 
-    distwt.cpp
     histogram.cpp
     effective_alphabet.cpp
 )
-
 target_link_libraries(distwt ${THRILL_DEPENDENCIES})
+
+add_subdirectory(apps)

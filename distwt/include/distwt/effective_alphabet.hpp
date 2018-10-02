@@ -1,9 +1,9 @@
 #pragma once
 
-#include "def.hpp"
-#include "histogram.hpp"
-
 #include <unordered_map>
+
+#include <distwt/def.hpp>
+#include <distwt/histogram.hpp>
 
 // type used for effective alphabet indices
 using ea_index_t = unsigned char;
