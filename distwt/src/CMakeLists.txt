@@ -9,6 +9,7 @@ add_library(distwt
 
     histogram.cpp
     effective_alphabet.cpp
+    wt.cpp
 )
 target_link_libraries(distwt ${THRILL_DEPENDENCIES})
 

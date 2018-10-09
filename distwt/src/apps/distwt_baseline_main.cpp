@@ -11,7 +11,6 @@
 #include <thrill/api/read_binary.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
-#include <thrill/api/write_binary.hpp>
 #include <thrill/api/window.hpp>
 
 #include <distwt/text.hpp>
@@ -89,24 +88,8 @@ void Process(
 
     // construct wt
     const size_t sigma = hist.size();
-    auto wt_bits = ConstructWT_StableSort(etext, sigma);
-
-    // write each level of the WT to file
-    for(size_t i = 0; i < wt_bits.size(); i++) {
-        wt_bits[i].WriteBinary(
-            output + ".lv_" + std::to_string(i+1));
-    }
-
-    if(ctx.my_rank() == 0) {
-        // write histogram to file
-        hist.save(output + ".hist");
-
-        // write original input size to file
-        {
-            binary::FileWriter w(output + ".size");
-            w.write(input_size);
-        }
-    }
+    WaveletTree wt(input_size, hist, ConstructWT_StableSort(etext, sigma));
+    wt.save(ctx, output);
 }
 
 int main(int argc, const char** argv) {
