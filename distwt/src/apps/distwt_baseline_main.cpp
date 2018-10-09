@@ -71,11 +71,11 @@ void Process(thrill::Context& ctx, std::string input, std::string output) {
     // compute histogram
     Histogram hist(rawtext);
 
-    // compute effective alphabet mapping
-    auto eamap = compute_ea_map(hist);
+    // compute effective alphabet
+    EffectiveAlphabet ea(hist);
 
-    // transform text using effective alphabet
-    auto etext = compute_effective_transformation(rawtext, eamap);
+    // transform text
+    auto etext = ea.transform(rawtext);
 
     // construct wt
     const size_t sigma = hist.size();

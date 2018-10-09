@@ -2,23 +2,22 @@
 
 #include <thrill/api/collapse.hpp>
 
-ea_map_t compute_ea_map(const Histogram& hist) {
-    ea_map_t map;
-
+EffectiveAlphabet::EffectiveAlphabet(const Histogram& hist) {
     size_t i = 0;
     for(auto e : hist.entries) {
-        map.emplace(e.first, esym_t(i++));
+        m_map.emplace(e.first, symbol_t(i++));
     }
-
-    return map;
 }
 
-etext_t compute_effective_transformation(
-    const rawtext_t& rawtext, const ea_map_t& eamap) {
+EffectiveAlphabet::~EffectiveAlphabet() {
+}
+
+EffectiveAlphabet::text_t EffectiveAlphabet::transform(
+    const rawtext_t& rawtext) const {
 
     return rawtext
-        .Map([eamap](rawsym_t x){
-            return eamap.at(x);
+        .Map([this](rawsym_t x){
+            return m_map.at(x);
         })
         .Collapse()
         .Execute(); // do it NOW
