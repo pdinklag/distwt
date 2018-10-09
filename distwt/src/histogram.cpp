@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include <thrill/api/all_gather.hpp>
 #include <thrill/api/reduce_by_key.hpp>
 #include <thrill/api/sort.hpp>
@@ -32,24 +30,24 @@ hist_t compute_histogram(const rawtext_t& rawtext) {
 }
 
 void save_histogram(const hist_t& hist, const std::string& filename) {
-    std::ofstream out(filename, std::ios::binary);
+    binary::FileWriter w(filename);
 
-    write_binary<size_t>(out, hist.size()); // num entries
+    w.write<size_t>(hist.size()); // num entries
     for(auto& e : hist) {
-        write_binary<rawsym_t>(out, e.first); // symbol
-        write_binary<size_t>(out, e.second);  // count
+        w.write<rawsym_t>(e.first); // symbol
+        w.write<size_t>(e.second);  // count
     }
 }
 
 hist_t load_histogram(const std::string& filename) {
-    std::ifstream in(filename, std::ios::binary);
+    binary::FileReader r(filename);
 
-    const size_t num_entries = read_binary<size_t>(in);
+    const size_t num_entries = r.template read<size_t>();
     hist_t hist(num_entries);
 
     for(size_t i = 0; i < num_entries; i++) {
-        const auto sym = read_binary<rawsym_t>(in);
-        const auto cnt = read_binary<size_t>(in);
+        const auto sym = r.template read<rawsym_t>();
+        const auto cnt = r.template read<size_t>();
 
         hist[i] = hist_entry_t(sym, cnt);
     }
