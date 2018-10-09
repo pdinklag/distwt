@@ -12,17 +12,15 @@
 #include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
 #include <thrill/api/write_binary.hpp>
+#include <thrill/api/window.hpp>
 
 #include <distwt/text.hpp>
+#include <distwt/util.hpp>
+#include <distwt/binary_io.hpp>
 #include <distwt/wt.hpp>
+
 #include <distwt/histogram.hpp>
 #include <distwt/effective_alphabet.hpp>
-
-// DIA type used for distributed bit vectors
-using bv_dia_t = thrill::DIA<bool>;
-
-// storage for a wavelet tree's bit vector
-using wt_bits_t = std::vector<bv_dia_t>;
 
 wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
     // compute size of WT
@@ -39,10 +37,17 @@ wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
         const size_t rsh = wt_height - 1 - level;
 
         // compute BV
-        bv = text
-            .Map([&](esym_t x) {
-                // get level-th bit of symbol
-                return bool((x >> rsh) & 1);
+        bv = text.Window(thrill::api::DisjointTag, 64,
+            [rsh](size_t, const std::vector<esym_t>& v) {
+                uint64_t bv = 0;
+                for(size_t i = 0; i < v.size(); i++) {
+                    // get level-th bit of symbol
+                    uint64_t bit = ((v[i] >> rsh) & 1) ? 1ULL : 0ULL;
+
+                    // write into bit vector
+                    bv |= (bit << (63ULL-i));
+                }
+                return bv;
             })
             .Cache()
             .Execute(); // TODO: why is this required?
@@ -64,7 +69,12 @@ wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
     return wt_bits;
 }
 
-void Process(thrill::Context& ctx, std::string input, std::string output) {
+void Process(
+    thrill::Context& ctx,
+    std::string input,
+    size_t input_size,
+    std::string output) {
+
     // load raw text
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
 
@@ -90,6 +100,12 @@ void Process(thrill::Context& ctx, std::string input, std::string output) {
     if(ctx.my_rank() == 0) {
         // write histogram to file
         hist.save(output + ".hist");
+
+        // write original input size to file
+        {
+            binary::FileWriter w(output + ".size");
+            w.write(input_size);
+        }
     }
 }
 
@@ -102,6 +118,6 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
-        Process(ctx, argv[1], argv[2]);
+        Process(ctx, argv[1], util::file_size(argv[1]), argv[2]);
     });
 }
