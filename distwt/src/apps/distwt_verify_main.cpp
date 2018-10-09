@@ -1,3 +1,4 @@
+#include <exception>
 #include <iostream>
 #include <tuple>
 
@@ -21,6 +22,11 @@
 #include <distwt/effective_alphabet.hpp>
 #include <distwt/histogram.hpp>
 #include <distwt/dia_compare.hpp>
+
+class wt_verification_failure : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 
 thrill::DIA<rawsym_t> DecodeWT(thrill::Context& ctx, const WaveletTree& wt) {
     using esym_index_t = std::pair<esym_t, size_t>;
@@ -101,11 +107,9 @@ void Process(thrill::Context& ctx,
     // output result on first worker
     if(ctx.my_rank() == 0) {
         if(diff == 0) {
-            std::cout <<
-                "WT verification succeeded!" << std::endl;
+            std::cout << "WT verification succeeded!" << std::endl;
         } else {
-            std::cout <<
-                "WT verification FAILED (diff = " << diff << ")!" << std::endl;
+            throw wt_verification_failure("WT verification FAILED");
         }
     }
 }
