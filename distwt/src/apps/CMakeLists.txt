@@ -4,6 +4,12 @@ add_executable(distwt-baseline
 )
 target_link_libraries(distwt-baseline distwt ${THRILL_DEPENDENCIES})
 
+# Implementation of the recursive algorithm
+add_executable(distwt-recursive
+    distwt_recursive_main.cpp
+)
+target_link_libraries(distwt-recursive distwt ${THRILL_DEPENDENCIES})
+
 # WT Verifier
 add_executable(distwt-verify
     distwt_verify_main.cpp
