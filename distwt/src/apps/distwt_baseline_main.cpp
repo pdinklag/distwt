@@ -69,7 +69,7 @@ void Process(thrill::Context& ctx, std::string input, std::string output) {
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
 
     // compute histogram
-    auto hist = compute_histogram(rawtext);
+    Histogram hist(rawtext);
 
     // compute effective alphabet mapping
     auto eamap = compute_ea_map(hist);
@@ -89,7 +89,7 @@ void Process(thrill::Context& ctx, std::string input, std::string output) {
 
     if(ctx.my_rank() == 0) {
         // write histogram to file
-        save_histogram(hist, output + ".hist");
+        hist.save(output + ".hist");
     }
 }
 

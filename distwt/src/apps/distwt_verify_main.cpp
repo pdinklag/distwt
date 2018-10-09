@@ -25,7 +25,7 @@
 thrill::DIA<rawsym_t> DecodeWT(
     thrill::Context& ctx,
     const wt_bits_t& wt_bits,
-    const hist_t& hist) {
+    const Histogram& hist) {
 
     using esym_index_t = std::pair<esym_t, size_t>;
 
@@ -61,7 +61,7 @@ thrill::DIA<rawsym_t> DecodeWT(
         })
         .Map([hist](esym_index_t x){
             // undo effective transformation
-            return hist[x.first].first;
+            return hist.entries[x.first].first;
         });
 
     return text.Cache();
@@ -70,7 +70,7 @@ thrill::DIA<rawsym_t> DecodeWT(
 void Process(thrill::Context& ctx, std::string original, std::string wtfile) {
 
     // load histogram
-    auto hist = load_histogram(wtfile + ".hist");
+    Histogram hist(wtfile + ".hist");
 
     // compute height of the WT
     const size_t sigma = hist.size();

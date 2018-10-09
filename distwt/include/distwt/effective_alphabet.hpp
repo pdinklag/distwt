@@ -74,7 +74,7 @@ using ea_map_t = std::unordered_map<rawsym_t, esym_t>;
 using etext_t = thrill::DIA<esym_t>;
 
 // compute EA map given a histogram
-ea_map_t compute_ea_map(const hist_t& hist);
+ea_map_t compute_ea_map(const Histogram& hist);
 
 // compute effective transformation of the given text
 etext_t compute_effective_transformation(
