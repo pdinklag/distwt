@@ -21,22 +21,25 @@
 #include <distwt/histogram.hpp>
 #include <distwt/effective_alphabet.hpp>
 
-wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
+WaveletTree::bits_t ConstructWT_StableSort(
+    const etext_t& input, const size_t sigma) {
+
+    WaveletTree::bits_t wt_bits;
+
     // compute size of WT
     const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
 
     // construct WT level by level using stable sorting approach
     auto text = input;
-    wt_bits_t wt_bits;
 
-    bv_dia_t bv;
     for(size_t level = 0; level < wt_height; level++) {
         //text.Print(std::string("text_") + std::to_string(level+1));
 
         const size_t rsh = wt_height - 1 - level;
 
         // compute BV
-        bv = text.Window(thrill::api::DisjointTag, 64,
+        wt_bits.emplace_back(text
+            .Window(thrill::api::DisjointTag, 64,
             [rsh](size_t, const std::vector<esym_t>& v) {
                 uint64_t bv = 0;
                 for(size_t i = 0; i < v.size(); i++) {
@@ -49,10 +52,8 @@ wt_bits_t ConstructWT_StableSort(const etext_t& input, const size_t sigma) {
                 return bv;
             })
             .Cache()
-            .Execute(); // TODO: why is this required?
-
-        //bv.Print(std::string("bv_") + std::to_string(level+1));
-        wt_bits.emplace_back(bv);
+            .Execute()
+        );
 
         if(level+1 < wt_height) {
             text = text
