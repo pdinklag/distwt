@@ -13,14 +13,30 @@ private:
     std::vector<entry_t> m_entries;
 
 public:
-    // compute histogram of the given input text
-    Histogram(const rawtext_t& rawtext);
+    inline Histogram() {
+    }
 
-    // load histogram from file
-    Histogram(const std::string& filename);
+    inline Histogram(Histogram&& other) : m_entries(other.m_entries) {
+    }
 
-    // destructor
-    ~Histogram();
+    inline Histogram(const Histogram& other) : m_entries(other.m_entries) {
+    }
+
+    Histogram(const rawtext_t& rawtext); // compute from text
+    Histogram(const std::string& filename); // load from file
+
+    inline ~Histogram() {
+    }
+
+    inline Histogram& operator=(Histogram&& other) {
+        m_entries = std::move(other.m_entries);
+        return *this;
+    }
+
+    inline Histogram& operator=(const Histogram& other) {
+        m_entries = other.m_entries;
+        return *this;
+    }
 
     // save histogram to file
     void save(const std::string& filename) const;
