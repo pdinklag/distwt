@@ -5,18 +5,15 @@
 #include <thrill/api/sum.hpp>
 #include <thrill/api/zip.hpp>
 
-template<typename ValueType>
-size_t dia_compare(
-    const thrill::DIA<ValueType>& a,
-    const thrill::DIA<ValueType>& b) {
-
+template<typename value_t, typename dia_a_t, typename dia_b_t>
+size_t dia_compare(const dia_a_t& a, const dia_b_t& b) {
     return a
-        .Zip(b, [](const ValueType& a, const ValueType& b){
+        .Zip(b, [](const value_t& va, const value_t& vb){
             // test if single items are equal
-            return (a != b) ? 1ULL : 0ULL;
+            return (va != vb) ? 1ULL : 0ULL;
         })
-        .Sum([](size_t a, size_t b){
+        .Sum([](size_t da, size_t db){
             // sum up amount of differing items (diff)
-            return a + b;
+            return da + db;
         }, 0ULL);
 }
