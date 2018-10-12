@@ -53,10 +53,10 @@ void recursiveWT(
     // TODO: heuristic for rebalancing based on node size?
 
     // left child
-    recursiveWT(wt, 2ULL * node_id, input_l.Collapse(), a, m);
+    recursiveWT(wt, 2ULL * node_id, input_l.Cache(), a, m);
 
     // right child
-    recursiveWT(wt, 2ULL * node_id + 1ULL, input_r.Collapse(), m+1, b);
+    recursiveWT(wt, 2ULL * node_id + 1ULL, input_r.Cache(), m+1, b);
 }
 
 void Process(
