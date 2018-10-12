@@ -7,6 +7,10 @@
 #include <thrill/api/write_binary.hpp>
 
 class WaveletTree {
+private:
+    thrill::Context* m_ctx; // current Thrill context
+    std::string m_filename; // base filename
+
 public:
     static inline size_t sigma(const Histogram& hist) {
         return hist.size();
@@ -16,11 +20,12 @@ public:
         return tlx::integer_log2_ceil(sigma(hist) - 1);
     }
 
-private:
-    thrill::Context* m_ctx; // current Thrill context
-    std::string m_filename; // base filename
+    static inline size_t num_nodes(const Histogram& hist) {
+        return (1ULL << height(hist)) - 1ULL;
+    }
 
-public:
+    static std::vector<size_t> node_sizes(const Histogram& hist);
+
     inline WaveletTree(thrill::Context& ctx, const std::string& filename)
         : m_ctx(&ctx), m_filename(filename) {
     }
@@ -37,17 +42,8 @@ public:
     }
 
     template<typename bv_t>
-    void save_node_bv(size_t node_id, bv_t&& bv, size_t len) const {
-        auto ext = std::string(".node_") + std::to_string(node_id);
-
-        // write bit vector
-        bv.WriteBinary(m_filename + ext);
-
-        if(m_ctx->my_rank() == 0) {
-            // write node length
-            binary::FileWriter w(m_filename + ext + ".len");
-            w.write(len);
-        }
+    void save_node_bv(size_t node_id, bv_t&& bv) const {
+        bv.WriteBinary(m_filename + ".node_" + std::to_string(node_id));
     }
 
     Histogram             load_histogram();

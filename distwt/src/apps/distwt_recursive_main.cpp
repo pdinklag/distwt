@@ -45,7 +45,7 @@ void recursiveWT(
                 }
             }
             return bv;
-        }), input.Keep().Size()); // TODO: compute node size using C array!
+        }));
 
     // "parallel split"
     auto input_l = input.Filter([m](const esym_t& c){ return (c <= m); });
@@ -78,14 +78,14 @@ void Process(
     auto etext = ea.transform(rawtext);
 
     // construct wt recursively
-    const size_t num_nodes = (1ULL << WaveletTree::height(hist)) - 1ULL;
-
     WaveletTree wt(ctx, output);
+
     recursiveWT(
         wt,
         1ULL,             // start with root node
         etext,            // start with full transformed text
-        0, num_nodes);    // start with [0, (2^h)-1] interval
+        0, WaveletTree::num_nodes(hist));
+                          // start with [0, (2^h)-1] interval
                           // this is done to stay compatible with the other
                           // algorithms -> TODO: any negative side effects?
 

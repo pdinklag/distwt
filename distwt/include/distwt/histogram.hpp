@@ -38,6 +38,9 @@ public:
         return *this;
     }
 
+    // compute C array
+    std::vector<size_t> compute_C() const;
+
     // save histogram to file
     void save(const std::string& filename) const;
 

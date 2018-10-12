@@ -43,6 +43,17 @@ Histogram::Histogram(const std::string& filename) {
     }
 }
 
+std::vector<size_t> Histogram::compute_C() const {
+    const size_t num_entries = m_entries.size();
+
+    std::vector<size_t> c(num_entries + 1);
+    c[0] = 0;
+    for(size_t i = 1; i <= num_entries; i++) {
+        c[i] = c[i-1] + m_entries[i-1].second;
+    }
+    return c;
+}
+
 void Histogram::save(const std::string& filename) const {
     binary::FileWriter w(filename);
 
