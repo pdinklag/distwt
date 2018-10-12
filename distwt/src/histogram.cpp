@@ -43,9 +43,6 @@ Histogram::Histogram(const std::string& filename) {
     }
 }
 
-Histogram::~Histogram() {
-}
-
 void Histogram::save(const std::string& filename) const {
     binary::FileWriter w(filename);
 

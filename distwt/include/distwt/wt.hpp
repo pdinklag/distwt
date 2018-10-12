@@ -1,42 +1,56 @@
 #pragma once
 
+#include <distwt/binary_io.hpp>
 #include <distwt/histogram.hpp>
+
 #include <thrill/api/dia.hpp>
+#include <thrill/api/write_binary.hpp>
 
 class WaveletTree {
 public:
-    using bv_t = thrill::DIA<uint64_t>;
-    using bits_t = std::vector<bv_t>;
+    static inline size_t sigma(const Histogram& hist) {
+        return hist.size();
+    }
+
+    static inline size_t height(const Histogram& hist) {
+        return tlx::integer_log2_ceil(sigma(hist) - 1);
+    }
 
 private:
-    size_t m_len;
-    Histogram m_hist;
-    bits_t m_bits;
-    // TODO: pointers
+    thrill::Context* m_ctx; // current Thrill context
+    std::string m_filename; // base filename
 
 public:
-    inline WaveletTree(size_t len, Histogram hist, bits_t bits)
-        : m_len(len), m_hist(hist), m_bits(bits) {
+    inline WaveletTree(thrill::Context& ctx, const std::string& filename)
+        : m_ctx(&ctx), m_filename(filename) {
     }
 
-    WaveletTree(thrill::Context& ctx, const std::string& filename);
-    ~WaveletTree();
-
-    void save(thrill::Context& ctx, const std::string& filename) const;
-
-    inline const bv_t& bits(size_t level) const {
-        return m_bits[level];
+    inline ~WaveletTree() {
     }
 
-    inline const Histogram& histogram() const {
-        return m_hist;
+    void save_histogram(const Histogram& hist) const;
+    void save_text_length(size_t len) const;
+
+    template<typename bv_t>
+    void save_level_bv(size_t level, bv_t&& bv) const {
+        bv.WriteBinary(m_filename + ".lv_" + std::to_string(level+1));
     }
 
-    inline size_t text_length() const {
-        return m_len;
+    template<typename bv_t>
+    void save_node_bv(size_t node_id, bv_t&& bv, size_t len) const {
+        auto ext = std::string(".node_") + std::to_string(node_id);
+
+        // write bit vector
+        bv.WriteBinary(m_filename + ext);
+
+        if(m_ctx->my_rank() == 0) {
+            // write node length
+            binary::FileWriter w(m_filename + ext + ".len");
+            w.write(len);
+        }
     }
 
-    inline size_t height() const {
-        return m_bits.size();
-    }
+    Histogram             load_histogram();
+    size_t                load_text_length();
+    thrill::DIA<uint64_t> load_level_bv(size_t level);
 };

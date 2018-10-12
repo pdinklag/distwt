@@ -6,13 +6,10 @@
 
 #include <thrill/api/dia.hpp>
 
-#include <thrill/api/cache.hpp>
+#include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
-#include <thrill/api/print.hpp>
 #include <thrill/api/read_binary.hpp>
-#include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
-#include <thrill/api/sum.hpp>
 #include <thrill/api/window.hpp>
 #include <thrill/api/zip.hpp>
 
@@ -28,21 +25,25 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-thrill::DIA<rawsym_t> DecodeWT(thrill::Context& ctx, const WaveletTree& wt) {
+auto DecodeWT(thrill::Context& ctx, const std::string& wtfile) {
     using esym_index_t = std::pair<esym_t, size_t>;
 
-    // reconstruct symbols from bit vector
-    const size_t n = wt.text_length();
+    // load auxiliary data
+    WaveletTree wt(ctx, wtfile);
+    const size_t n = wt.load_text_length();
+    auto hist = wt.load_histogram();
+
+    // construct indexed sequence of 0 symbols
     auto xtext = thrill::api::Generate(ctx, n, [](size_t i){
-        // construct indexed sequence of 0 symbols
         return esym_index_t(0, i);}
     );
 
-    const size_t wt_height = wt.height();
-    for(size_t level = 0; level < wt_height; level++) {
-        const size_t lsh = wt_height - 1 - level;
+    // reconstruct symbols from bit vector level by level
+    const size_t height = WaveletTree::height(hist);
+    for(size_t level = 0; level < height; level++) {
+        const size_t lsh = height - 1ULL - level;
 
-        xtext = wt.bits(level)
+        xtext = wt.load_level_bv(level)
             .template FlatMap<bool>([](const uint64_t& x, auto emit) {
                 // expand bits to 64 boolean values
                 for(size_t i = 0; i < 64; ++i) {
@@ -50,14 +51,16 @@ thrill::DIA<rawsym_t> DecodeWT(thrill::Context& ctx, const WaveletTree& wt) {
                 }
             })
             .template FlatWindow<bool>(thrill::api::DisjointTag, 64,
-            [n](size_t index, const std::vector<bool>& rb, auto emit) {
+            [n](size_t index, const std::vector<bool>& v, auto emit) {
 
                 // cut off bits beyond original input size
-                for(size_t i = 0; i < rb.size(); i++) {
+                if(index >= n) return;
+
+                for(size_t i = 0; i < v.size(); i++) {
                     if(index++ >= n) {
                         break;
                     } else {
-                        emit(rb[i]);
+                        emit(v[i]);
                     }
                 }
             })
@@ -69,47 +72,42 @@ thrill::DIA<rawsym_t> DecodeWT(thrill::Context& ctx, const WaveletTree& wt) {
                 // stably reorder according to newest bit
                 return (a.first >> lsh) < (b.first >> lsh);
             })
-            .Execute() // do it NOW
             .Collapse();
     }
 
     // restore original text
-    const auto& hist = wt.histogram();
-    auto text = xtext
+    return xtext
         .Sort([](esym_index_t a, esym_index_t b){
             // sort back by original index
             return a.second < b.second;
         })
-        .Map([hist](esym_index_t x){
+        .Map([hist](esym_index_t x){ // TODO: capture hist by reference?
             // undo effective transformation
             return hist.entries[x.first].first;
         });
-
-    return text.Cache();
 }
 
 void Process(thrill::Context& ctx,
     std::string original,
     std::string wtfile) {
 
-    // load WT
-    WaveletTree wt(ctx, wtfile);
+    // decode WT
+    auto decoded = DecodeWT(ctx, wtfile);
 
     // load raw text
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, original);
 
-    // decode WT
-    auto decoded = DecodeWT(ctx, wt);
-
     // compare raw and decoded texts as a means to verify the WT
-    const size_t diff = dia_compare(rawtext, decoded);
+    const size_t diff = dia_compare<rawsym_t>(rawtext, decoded);
 
     // output result on first worker
     if(ctx.my_rank() == 0) {
         if(diff == 0) {
             std::cout << "WT verification succeeded!" << std::endl;
         } else {
-            throw wt_verification_failure("WT verification FAILED");
+            throw wt_verification_failure(
+                std::string("WT verification FAILED: diff=") +
+                std::to_string(diff));
         }
     }
 }

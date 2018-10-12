@@ -1,51 +1,32 @@
 #include <distwt/wt.hpp>
-#include <distwt/binary_io.hpp>
 
 #include <thrill/api/read_binary.hpp>
-#include <thrill/api/write_binary.hpp>
 
-WaveletTree::WaveletTree(
-    thrill::Context& ctx,
-    const std::string& filename)
-    : m_hist(filename + ".hist") {
-
-    // read text length
-    {
-        binary::FileReader r(filename + ".len");
-        m_len = r.template read<size_t>();
-    }
-
-    // compute height and read bits
-    const size_t sigma = m_hist.size();
-    const size_t height = tlx::integer_log2_ceil(sigma-1);
-
-    for(size_t i = 0; i < height; i++) {
-        m_bits.emplace_back(thrill::api::ReadBinary<uint64_t>(
-            ctx, filename + "*.lv_" + std::to_string(i+1)));
-    }
-}
-
-WaveletTree::~WaveletTree() {
-}
-
-void WaveletTree::save(
-    thrill::Context& ctx,
-    const std::string& filename) const {
-
-    // write each level of the WT to file
-    for(size_t i = 0; i < m_bits.size(); i++) {
-        m_bits[i].WriteBinary(
-            filename + ".lv_" + std::to_string(i+1));
-    }
-
-    if(ctx.my_rank() == 0) {
+void WaveletTree::save_histogram(const Histogram& hist) const {
+    if(m_ctx->my_rank() == 0) {
         // write histogram to file
-        m_hist.save(filename + ".hist");
-
-        // write text length to file
-        {
-            binary::FileWriter w(filename + ".len");
-            w.write(m_len);
-        }
+        hist.save(m_filename + ".hist");
     }
+}
+
+void WaveletTree::save_text_length(size_t len) const {
+    if(m_ctx->my_rank() == 0) {
+        // write text length to file
+        binary::FileWriter w(m_filename + ".len");
+        w.write(len);
+    }
+}
+
+Histogram WaveletTree::load_histogram() {
+    return Histogram(m_filename + ".hist");
+}
+
+size_t WaveletTree::load_text_length() {
+    binary::FileReader r(m_filename + ".len");
+    return r.template read<size_t>();
+}
+
+thrill::DIA<uint64_t> WaveletTree::load_level_bv(size_t level) {
+    return thrill::api::ReadBinary<uint64_t>(
+        *m_ctx, m_filename + "*.lv_" + std::to_string(level+1));
 }

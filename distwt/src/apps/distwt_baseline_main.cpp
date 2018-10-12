@@ -6,6 +6,7 @@
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
+#include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
 #include <thrill/api/read_binary.hpp>
@@ -20,54 +21,6 @@
 
 #include <distwt/histogram.hpp>
 #include <distwt/effective_alphabet.hpp>
-
-WaveletTree::bits_t ConstructWT_StableSort(
-    const etext_t& input, const size_t sigma) {
-
-    WaveletTree::bits_t wt_bits;
-
-    // compute size of WT
-    const size_t wt_height = tlx::integer_log2_ceil(sigma-1);
-
-    // construct WT level by level using stable sorting approach
-    auto text = input;
-
-    for(size_t level = 0; level < wt_height; level++) {
-        //text.Print(std::string("text_") + std::to_string(level+1));
-
-        const size_t rsh = wt_height - 1 - level;
-
-        // compute BV
-        wt_bits.emplace_back(text
-            .Window(thrill::api::DisjointTag, 64,
-            [rsh](size_t, const std::vector<esym_t>& v) {
-                uint64_t bv = 0;
-                for(size_t i = 0; i < v.size(); i++) {
-                    // get level-th bit of symbol
-                    uint64_t bit = ((v[i] >> rsh) & 1) ? 1ULL : 0ULL;
-
-                    // write into bit vector
-                    bv |= (bit << (63ULL-i));
-                }
-                return bv;
-            })
-            .Cache()
-            .Execute()
-        );
-
-        if(level+1 < wt_height) {
-            text = text
-                .SortStable(
-                    [&](esym_t a, esym_t b){
-                        // stably sort according to newest bit
-                        return (a >> rsh) < (b >> rsh);
-                    })
-                .Execute() // NOW!
-                .Collapse();
-        }
-    }
-    return wt_bits;
-}
 
 void Process(
     thrill::Context& ctx,
@@ -88,9 +41,42 @@ void Process(
     auto etext = ea.transform(rawtext);
 
     // construct wt
-    const size_t sigma = hist.size();
-    WaveletTree wt(input_size, hist, ConstructWT_StableSort(etext, sigma));
-    wt.save(ctx, output);
+    const size_t height = WaveletTree::height(hist);
+
+    WaveletTree wt(ctx, output);
+    {
+        auto text = etext;
+        for(size_t level = 0; level < height; level++) {
+            const size_t rsh = height - 1 - level;
+
+            // compute and store BV
+            wt.save_level_bv(level,
+                text.Window(thrill::api::DisjointTag, 64,
+                [rsh](size_t, const std::vector<esym_t>& v) {
+                    uint64_t bv = 0;
+                    for(size_t i = 0; i < v.size(); i++) {
+                        // check level-th bit of symbol
+                        if((v[i] >> rsh) & 1) {
+                            bv |= (1ULL << (63ULL-i));
+                        }
+                    }
+                    return bv;
+                })
+            );
+
+            if(level+1 < height) {
+                text = text.SortStable(
+                    [rsh](esym_t a, esym_t b){
+                        // stably sort according to newest bit
+                        return (a >> rsh) < (b >> rsh);
+                    }).Collapse();
+            }
+        }
+    }
+
+    // store additional information
+    wt.save_histogram(hist);
+    wt.save_text_length(input_size);
 }
 
 int main(int argc, const char** argv) {
