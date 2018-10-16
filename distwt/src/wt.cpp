@@ -9,13 +9,15 @@ void recursive_node_sizes(
     size_t a,
     size_t b) {
 
-    if(a == b) return;
+    if(a < b) {
+        sizes[node_id - 1] =
+            c[std::min(b+1, c.size()-1)] -
+            c[std::min(a,   c.size()-1)];
 
-    sizes[node_id - 1] = c[std::min(b+1, c.size()-1)] - c[a];
-
-    const size_t m = (a+b)/2;
-    recursive_node_sizes(sizes, c, 2ULL * node_id, a, m);
-    recursive_node_sizes(sizes, c, 2ULL * node_id + 1ULL, m+1, b);
+        const size_t m = (a+b)/2;
+        recursive_node_sizes(sizes, c, 2ULL * node_id, a, m);
+        recursive_node_sizes(sizes, c, 2ULL * node_id + 1ULL, m+1, b);
+    }
 }
 
 std::vector<size_t> WaveletTree::node_sizes(const Histogram& hist) {
