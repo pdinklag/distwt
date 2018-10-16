@@ -27,7 +27,9 @@ template<typename input_t>
 void recursiveWT(
     WaveletTree& wt,
     const std::vector<size_t>& node_sizes,
-    const float balance_threshold,
+    const float lower_threshold,
+    const float upper_threshold,
+    const size_t original_input_size,
     const size_t node_id,
     input_t input,
     const size_t a,
@@ -49,18 +51,18 @@ void recursiveWT(
         }));
 
     // "parallel split"
-    const size_t sz = node_sizes[node_id - 1ULL];
     auto balanced_recurse = [&](auto s, size_t id, size_t x, size_t y) {
         if(x < y) {
             const size_t child_sz = node_sizes[id-1];
-            const float p = float(child_sz) / float(sz);
-            if(p < balance_threshold) {
-                LOG1 << "p = " << p << " for node " << id << " - rebalancing"
-                    << " (child_sz = " << child_sz << ", sz = " << sz << ")";
-                recursiveWT(wt, node_sizes, balance_threshold,
+            const float p = float(child_sz) / float(original_input_size);
+            if(lower_threshold < p && p < upper_threshold) {
+                LOG1 << "p = " << p << " for node " << id << " - rebalancing";
+                recursiveWT(wt, node_sizes,
+                    lower_threshold, upper_threshold, original_input_size,
                     id, s.Rebalance().Cache(), x, y);
             } else {
-                recursiveWT(wt, node_sizes, balance_threshold,
+                recursiveWT(wt, node_sizes,
+                    lower_threshold, upper_threshold, original_input_size,
                     id, s.Cache(), x, y);
             }
         }
@@ -81,7 +83,8 @@ void Process(
     std::string input,
     size_t input_size,
     std::string output,
-    const float balance_threshold) {
+    const float lower_threshold,
+    const float upper_threshold) {
 
     // load raw text
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
@@ -102,7 +105,9 @@ void Process(
     recursiveWT(
         wt,
         node_sizes,
-        balance_threshold,
+        lower_threshold,
+        upper_threshold,
+        input_size,
         1ULL,             // start with root node
         etext,            // start with full transformed text
         0, WaveletTree::num_nodes(hist));
@@ -117,20 +122,17 @@ void Process(
 int main(int argc, const char** argv) {
     // basic argument parsing
     if (argc < 3) {
-        std::cout << "Usage: " << argv[0] << " <input> <output> [threshold]" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <input> <output> [p] [q]" << std::endl;
         return -1;
     }
 
-    float balance_threshold;
-    if(argc >= 4) {
-        balance_threshold = std::stof(argv[3]);
-    } else {
-        balance_threshold = 0.0f;
-    }
+    float upper_threshold = (argc >= 4) ? std::stof(argv[3]) : 0.0f;
+    float lower_threshold = (argc >= 5) ? std::stof(argv[4]) : 1.0f;
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
-        Process(ctx, argv[1], util::file_size(argv[1]), argv[2], balance_threshold);
+        Process(ctx, argv[1], util::file_size(argv[1]), argv[2],
+            lower_threshold, upper_threshold);
     });
 }
 
