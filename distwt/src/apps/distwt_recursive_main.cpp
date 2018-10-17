@@ -96,7 +96,7 @@ void Process(
     EffectiveAlphabet ea(hist);
 
     // transform text
-    auto etext = ea.transform(rawtext);
+    auto etext = ea.transform(rawtext).Cache();
 
     // construct wt recursively
     WaveletTree wt(ctx, output);

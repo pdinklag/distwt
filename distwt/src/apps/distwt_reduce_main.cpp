@@ -37,7 +37,7 @@ void Process(
     EffectiveAlphabet ea(hist);
 
     // transform text
-    auto etext = ea.transform(rawtext);
+    auto etext = ea.transform(rawtext).Cache();
 
     // TODO: construct WT
     // WaveletTree wt(ctx, output);

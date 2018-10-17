@@ -19,6 +19,5 @@ EffectiveAlphabet::text_t EffectiveAlphabet::transform(
         .Map([this](rawsym_t x){
             return m_map.at(x);
         })
-        .Collapse()
-        .Execute(); // do it NOW
+        .Collapse();
 }
