@@ -34,7 +34,6 @@ public:
     }
 
     void save_histogram(const Histogram& hist) const;
-    void save_text_length(size_t len) const;
 
     template<typename bv_t>
     void save_level_bv(size_t level, bv_t&& bv) const {
@@ -47,6 +46,5 @@ public:
     }
 
     Histogram             load_histogram();
-    size_t                load_text_length();
     thrill::DIA<uint64_t> load_level_bv(size_t level);
 };

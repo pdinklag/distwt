@@ -1,3 +1,5 @@
+#include <numeric>
+
 #include <thrill/api/all_gather.hpp>
 #include <thrill/api/reduce_by_key.hpp>
 #include <thrill/api/sort.hpp>
@@ -52,6 +54,15 @@ std::vector<size_t> Histogram::compute_C() const {
         c[i] = c[i-1] + m_entries[i-1].second;
     }
     return c;
+}
+
+size_t Histogram::text_length() const {
+    return std::accumulate(
+        m_entries.begin(),
+        m_entries.end(),
+        size_t(0),
+        [](size_t n, const auto& e){ return n + e.second; }
+    );
 }
 
 void Histogram::save(const std::string& filename) const {

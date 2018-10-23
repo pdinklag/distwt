@@ -74,9 +74,8 @@ void Process(
         }
     }
 
-    // store additional information
+    // store histogram
     wt.save_histogram(hist);
-    wt.save_text_length(input_size);
 }
 
 int main(int argc, const char** argv) {

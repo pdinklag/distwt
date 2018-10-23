@@ -41,6 +41,10 @@ public:
     // compute C array
     std::vector<size_t> compute_C() const;
 
+    // computes the text length from the histogram
+    // (this equals the final entry of the C array)
+    size_t text_length() const;
+
     // save histogram to file
     void save(const std::string& filename) const;
 

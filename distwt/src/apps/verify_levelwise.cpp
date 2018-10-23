@@ -26,12 +26,13 @@ public:
 };
 
 auto DecodeWT(thrill::Context& ctx, const std::string& wtfile) {
+    // indexed symbol
     using esym_index_t = std::pair<esym_t, size_t>;
 
     // load auxiliary data
     WaveletTree wt(ctx, wtfile);
-    const size_t n = wt.load_text_length();
     auto hist = wt.load_histogram();
+    const size_t n = hist.text_length();
 
     // construct indexed sequence of 0 symbols
     auto xtext = thrill::api::Generate(ctx, n, [](size_t i){

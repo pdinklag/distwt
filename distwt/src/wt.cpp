@@ -38,21 +38,8 @@ void WaveletTree::save_histogram(const Histogram& hist) const {
     }
 }
 
-void WaveletTree::save_text_length(size_t len) const {
-    if(m_ctx->my_rank() == 0) {
-        // write text length to file
-        binary::FileWriter w(m_filename + ".len");
-        w.write(len);
-    }
-}
-
 Histogram WaveletTree::load_histogram() {
     return Histogram(m_filename + ".hist");
-}
-
-size_t WaveletTree::load_text_length() {
-    binary::FileReader r(m_filename + ".len");
-    return r.template read<size_t>();
 }
 
 thrill::DIA<uint64_t> WaveletTree::load_level_bv(size_t level) {
