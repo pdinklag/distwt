@@ -12,7 +12,6 @@
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
 #include <thrill/api/read_binary.hpp>
-#include <thrill/api/size.hpp> // debug
 #include <thrill/api/sort.hpp>
 #include <thrill/api/window.hpp>
 #include <thrill/api/zip.hpp>
@@ -75,13 +74,6 @@ thrill::DIA<esym_index_t> RecursiveDecode(
         [](const esym_index_t& x, esym_t c){
             return esym_index_t(x.first | c, x.second);
         }).Cache();
-
-    // DEBUG begin
-    size_t sz = zipped.Keep().Size();
-    if(ctx.my_rank() == 0) {
-        LOG1 << "node_id = " << node_id << ", size = " << sz;
-    }
-    // DEBUG end
 
     if(level + 1 < height) {
         // recurse
