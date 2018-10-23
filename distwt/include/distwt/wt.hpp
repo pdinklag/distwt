@@ -47,4 +47,5 @@ public:
 
     Histogram             load_histogram();
     thrill::DIA<uint64_t> load_level_bv(size_t level);
+    thrill::DIA<uint64_t> load_node_bv(size_t node_id);
 };

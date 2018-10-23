@@ -13,3 +13,7 @@ target_link_libraries(flat distwt ${THRILL_DEPENDENCIES})
 # Levelwise verifier
 add_executable(verify-levelwise verify_levelwise.cpp)
 target_link_libraries(verify-levelwise distwt ${THRILL_DEPENDENCIES})
+
+# Node based verifier
+add_executable(verify-nodebased verify_nodebased.cpp)
+target_link_libraries(verify-nodebased distwt ${THRILL_DEPENDENCIES})
