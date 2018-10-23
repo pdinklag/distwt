@@ -19,6 +19,7 @@
 #include <distwt/effective_alphabet.hpp>
 #include <distwt/histogram.hpp>
 #include <distwt/dia_compare.hpp>
+#include <distwt/dia_prefix.hpp>
 
 class wt_verification_failure : public std::runtime_error {
 public:
@@ -44,30 +45,17 @@ auto DecodeWT(thrill::Context& ctx, const std::string& wtfile) {
     for(size_t level = 0; level < height; level++) {
         const size_t lsh = height - 1ULL - level;
 
-        xtext = wt.load_level_bv(level)
-            .template FlatMap<bool>([](const uint64_t& x, auto emit) {
+        xtext = dia_prefix<esym_t>(wt.load_level_bv(level)
+            .template FlatMap<esym_t>([lsh](const uint64_t& x, auto emit) {
                 // expand bits to 64 boolean values
                 for(size_t i = 0; i < 64; ++i) {
-                    emit((x & (1ULL << (63ULL - i))));
+                    bool b = (x & (1ULL << (63ULL - i)));
+                    emit(esym_t(b) << lsh);
                 }
-            })
-            .template FlatWindow<bool>(thrill::api::DisjointTag, 64,
-            [n](size_t index, const std::vector<bool>& v, auto emit) {
-
-                // cut off bits beyond original input size
-                if(index >= n) return;
-
-                for(size_t i = 0; i < v.size(); i++) {
-                    if(index++ >= n) {
-                        break;
-                    } else {
-                        emit(v[i]);
-                    }
-                }
-            })
-            .Zip(xtext, [lsh](bool bit, esym_index_t x) {
+            }), n)
+            .Zip(xtext, [lsh](esym_t c, esym_index_t x) {
                 // OR symbols using current vector
-                return esym_index_t(x.first | (bit << lsh), x.second);
+                return esym_index_t(x.first | c, x.second);
             })
             .SortStable([lsh](esym_index_t a, esym_index_t b){
                 // stably reorder according to newest bit
