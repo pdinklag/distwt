@@ -101,7 +101,7 @@ thrill::DIA<esym_index_t> RecursiveDecode(
 
         return l.Concat(r).Cache();
     } else {
-        return zipped.Cache();
+        return zipped;
     }
 }
 
