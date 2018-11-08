@@ -14,3 +14,5 @@ add_library(distwt
 target_link_libraries(distwt ${THRILL_DEPENDENCIES})
 
 add_subdirectory(apps)
+add_subdirectory(mpi)
+
