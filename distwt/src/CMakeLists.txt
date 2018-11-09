@@ -13,6 +13,8 @@ add_subdirectory(mpi-apps)
 set(THRILL_DEPENDENCIES
     distwt-common
     ${THRILL_LIBRARIES}
+    ${FOXXL_LIBRARIES}
+    ${TLX_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${BZIP2_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}

@@ -13,10 +13,13 @@ find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(BZip2 REQUIRED)
 find_package(MPI REQUIRED)
+find_package(TLX REQUIRED)
+find_package(FOXXL REQUIRED)
 find_package(Thrill REQUIRED)
 
 include_directories(${MPI_INCLUDE_PATH})
 include_directories(${TLX_INCLUDE_DIRS})
+include_directories(${FOXXL_INCLUDE_DIRS})
 include_directories(${THRILL_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
