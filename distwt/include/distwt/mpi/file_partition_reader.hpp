@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+
 #include <distwt/mpi/context.hpp>
 
 class FilePartitionReader {
@@ -19,8 +20,6 @@ public:
     inline size_t local_offset() const { return m_local_offset; }
     inline size_t local_num() const { return m_local_num; }
 
-    template<typename item_t>
-    void process_local(std::function<void(item_t)> func) const {
-        // TODO: bind FOXXL array of item_t to syscall file and scan local part
-    }
+    void process_local(
+        std::function<void(unsigned char)> func, size_t bufsize) const;
 };
