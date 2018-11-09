@@ -15,9 +15,9 @@ public:
     MPIContext(int* argc, char*** argv);
     ~MPIContext();
 
-    inline int num_workers() { return m_num_workers; }
-    inline int rank() { return m_rank; }
+    inline int num_workers() const { return m_num_workers; }
+    inline int rank() const { return m_rank; }
 
-    std::ostream& cout();
-    std::ostream& cout(bool b);
+    std::ostream& cout() const;
+    std::ostream& cout(bool b) const;
 };

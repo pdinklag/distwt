@@ -15,13 +15,13 @@ MPIContext::~MPIContext() {
     MPI_Finalize();
 }
 
-std::ostream& MPIContext::cout() {
+std::ostream& MPIContext::cout() const {
     const double local_dt = util::time() - m_start_time;
     return (std::cout <<
         "[#" << m_rank <<
         " @" << std::setprecision(3) << std::fixed << local_dt << "] ");
 }
 
-std::ostream& MPIContext::cout(bool b) {
+std::ostream& MPIContext::cout(bool b) const {
     return b ? cout() : m_devnull;
 }
