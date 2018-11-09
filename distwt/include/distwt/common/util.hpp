@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <fstream>
 #include <vector>
 
@@ -11,6 +12,12 @@ inline size_t file_size(const std::string& filename) {
     struct stat buf;
     stat(filename.c_str(), &buf);
     return buf.st_size;
+}
+
+inline double time() {
+    using namespace std::chrono;
+    return double(duration_cast<milliseconds>(
+        system_clock::now().time_since_epoch()).count()) / 1000.0;
 }
 
 }
