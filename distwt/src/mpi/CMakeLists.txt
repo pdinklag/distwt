@@ -1,5 +1,5 @@
 add_library(distwt-mpi
 
-    INTERFACE # no files yet
+    context.cpp
 )
-#target_link_libraries(distwt-mpi ${MPI_DEPENDENCIES})
+target_link_libraries(distwt-mpi ${MPI_DEPENDENCIES})
