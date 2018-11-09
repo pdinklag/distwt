@@ -13,13 +13,15 @@
 #include <thrill/api/window.hpp>
 #include <thrill/api/zip.hpp>
 
-#include <distwt/text.hpp>
-#include <distwt/wt.hpp>
-#include <distwt/binary_io.hpp>
-#include <distwt/effective_alphabet.hpp>
-#include <distwt/histogram.hpp>
-#include <distwt/dia_compare.hpp>
-#include <distwt/dia_prefix.hpp>
+#include <distwt/common/binary_io.hpp>
+#include <distwt/common/util.hpp>
+
+#include <distwt/thrill/text.hpp>
+#include <distwt/thrill/wt.hpp>
+#include <distwt/thrill/effective_alphabet.hpp>
+#include <distwt/thrill/histogram.hpp>
+#include <distwt/thrill/dia_compare.hpp>
+#include <distwt/thrill/dia_prefix.hpp>
 
 class wt_verification_failure : public std::runtime_error {
 public:

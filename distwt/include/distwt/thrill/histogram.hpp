@@ -3,7 +3,7 @@
 #include <string>
 #include <tuple>
 
-#include <distwt/text.hpp>
+#include <distwt/thrill/text.hpp>
 
 class Histogram {
 public:

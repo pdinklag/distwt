@@ -1,4 +1,4 @@
-#include <distwt/wt.hpp>
+#include <distwt/thrill/wt.hpp>
 
 #include <thrill/api/read_binary.hpp>
 

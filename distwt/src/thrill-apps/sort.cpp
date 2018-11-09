@@ -14,13 +14,13 @@
 #include <thrill/api/sort.hpp>
 #include <thrill/api/window.hpp>
 
-#include <distwt/text.hpp>
-#include <distwt/util.hpp>
-#include <distwt/binary_io.hpp>
-#include <distwt/wt.hpp>
+#include <distwt/common/binary_io.hpp>
+#include <distwt/common/util.hpp>
 
-#include <distwt/histogram.hpp>
-#include <distwt/effective_alphabet.hpp>
+#include <distwt/thrill/text.hpp>
+#include <distwt/thrill/wt.hpp>
+#include <distwt/thrill/histogram.hpp>
+#include <distwt/thrill/effective_alphabet.hpp>
 
 void Process(
     thrill::Context& ctx,

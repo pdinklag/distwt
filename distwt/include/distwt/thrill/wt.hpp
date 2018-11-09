@@ -1,7 +1,7 @@
 #pragma once
 
-#include <distwt/binary_io.hpp>
-#include <distwt/histogram.hpp>
+#include <distwt/common/binary_io.hpp>
+#include <distwt/thrill/histogram.hpp>
 
 #include <thrill/api/dia.hpp>
 #include <thrill/api/write_binary.hpp>

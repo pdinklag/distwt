@@ -1,4 +1,5 @@
-# Sort
-add_executable(mpi-hello mpi_hello.cpp)
-target_link_libraries(mpi-hello ${MPI_LIBRARIES})
+add_library(distwt-mpi
 
+    INTERFACE # no files yet
+)
+#target_link_libraries(distwt-mpi ${MPI_DEPENDENCIES})

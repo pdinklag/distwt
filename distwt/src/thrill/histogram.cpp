@@ -4,8 +4,8 @@
 #include <thrill/api/reduce_by_key.hpp>
 #include <thrill/api/sort.hpp>
 
-#include <distwt/histogram.hpp>
-#include <distwt/binary_io.hpp>
+#include <distwt/common/binary_io.hpp>
+#include <distwt/thrill/histogram.hpp>
 
 Histogram::Histogram(const rawtext_t& rawtext) {
     m_entries = rawtext

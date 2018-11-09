@@ -2,8 +2,8 @@
 
 #include <unordered_map>
 
-#include <distwt/text.hpp>
-#include <distwt/histogram.hpp>
+#include <distwt/thrill/text.hpp>
+#include <distwt/thrill/histogram.hpp>
 
 class EffectiveAlphabet {
 public:
