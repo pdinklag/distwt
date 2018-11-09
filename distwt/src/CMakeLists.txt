@@ -2,7 +2,10 @@
 add_subdirectory(common)
 
 # distwt-mpi
-set(MPI_DEPENDENCIES distwt-common ${MPI_LIBRARIES})
+set(MPI_DEPENDENCIES
+    distwt-common
+    ${MPI_LIBRARIES}
+    ${TLX_LIBRARIES})
 add_subdirectory(mpi)
 
 # mpi apps

@@ -1,3 +1,5 @@
+#include <tlx/math/div_ceil.hpp>
+
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
 
@@ -7,7 +9,8 @@ FilePartitionReader::FilePartitionReader(
     : m_filename(filename) {
 
     m_total_size = util::file_size(m_filename);
-    const size_t sz_per_worker = m_total_size / size_t(ctx.num_workers()); // TODO: CEIL!!
+    const size_t sz_per_worker = tlx::div_ceil(
+        m_total_size, size_t(ctx.num_workers()));
 
     m_local_offset = sz_per_worker * size_t(ctx.rank());
     const size_t local_end = std::min(
