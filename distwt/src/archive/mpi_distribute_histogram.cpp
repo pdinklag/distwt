@@ -11,6 +11,9 @@ void distribute_histogram_group(
     const MPIContext& ctx,
     size_t* hist) {
 
+    constexpr int TAG_LOCAL_HIST_ENTRY = 100;
+    constexpr int TAG_GLOBAL_HIST_ENTRY = 101;
+
     // define message structure
     struct entry_msg_t {
         unsigned char sym; // the symbol in question

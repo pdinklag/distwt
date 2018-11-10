@@ -1,14 +1,26 @@
-#include <array>
 #include <tlx/cmdline_parser.hpp>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
 
-constexpr int TAG_LOCAL_HIST_ENTRY = 100;
-constexpr int TAG_GLOBAL_HIST_ENTRY = 101;
-
 constexpr size_t SIGMA_MAX = 256ULL;
+
+void compute_histogram(
+    const FilePartitionReader& input,
+    const size_t bufsize,
+    size_t* hist) {
+
+    // Compute local histogram
+    size_t local_hist[SIGMA_MAX] = {0};
+    input.process_local([&](unsigned char c){
+        ++local_hist[c];
+    }, bufsize);
+
+    // distribute
+    MPI_Allreduce(local_hist, hist, SIGMA_MAX,
+        MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+}
 
 int main(int argc, char** argv) {
     // Init MPI
@@ -26,23 +38,17 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    // Compute local histogram
+    // Get input partition
     FilePartitionReader input(ctx, input_filename);
 
-    size_t local_hist[SIGMA_MAX] = {0};
-    input.process_local([&](unsigned char c){
-        ++local_hist[c];
-    }, memory);
-
-    // distribute histogram
+    // Compute histogram
     size_t hist[SIGMA_MAX] = {0};
-    MPI_Allreduce(local_hist, hist, SIGMA_MAX,
-        MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+    compute_histogram(input, memory, hist);
 
     // debug
     for(size_t c = 0; c < SIGMA_MAX; c++) {
-        if(local_hist[c] > 0) {
-            ctx.cout() << "'" << (unsigned char)c << "' -> " << local_hist[c] << std::endl;
+        if(hist[c] > 0) {
+            ctx.cout() << "'" << (unsigned char)c << "' -> " << hist[c] << std::endl;
         }
     }
 
