@@ -1,5 +1,7 @@
 add_library(distwt-common
 
-    INTERFACE # no files yet
+    effective_alphabet.cpp
+    histogram.cpp
+    wt.cpp
 )
-# TODO: add dependencies here
+target_link_libraries(distwt-common ${COMMON_DEPENDENCIES})

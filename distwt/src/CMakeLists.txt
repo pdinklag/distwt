@@ -1,4 +1,5 @@
 # distwt-common
+set(COMMON_DEPENDENCIES ${TLX_LIBRARIES})
 add_subdirectory(common)
 
 # distwt-mpi
