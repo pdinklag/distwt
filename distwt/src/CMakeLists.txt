@@ -21,6 +21,7 @@ set(THRILL_DEPENDENCIES
     ${TLX_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${BZIP2_LIBRARIES}
+    ${MPI_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     ${CMAKE_DL_LIBS})
 add_subdirectory(thrill)
