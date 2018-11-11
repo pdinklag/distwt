@@ -1,7 +1,3 @@
-# Hello
-add_executable(hello hello.cpp)
-target_link_libraries(hello ${MPI_APP_DEPENDENCIES})
-
-# Test
-add_executable(mpihist hist.cpp)
-target_link_libraries(mpihist ${MPI_APP_DEPENDENCIES})
+# Histogram computation
+add_executable(mpi-hist hist.cpp)
+target_link_libraries(mpi-hist ${MPI_APP_DEPENDENCIES})
