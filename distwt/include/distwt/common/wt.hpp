@@ -1,28 +1,37 @@
 #pragma once
 
-#include <tlx/math/integer_log2.hpp>
+#include <string>
+#include <vector>
+
 #include <distwt/common/histogram.hpp>
 
 class WaveletTreeBase {
 protected:
-    std::string m_filename; // base filename
+    size_t m_sigma;
+    size_t m_height;
+
+    std::vector<size_t> m_node_sizes;
 
 public:
-    static inline size_t sigma(const HistogramBase& hist) {
-        return hist.size();
+    static inline std::string histogram_extension() {
+        return "hist";
     }
 
-    static inline size_t height(const HistogramBase& hist) {
-        return tlx::integer_log2_ceil(sigma(hist) - 1);
+    static inline std::string level_extension(size_t level) {
+        return "lv_" + std::to_string(level+1);
     }
 
-    static inline size_t num_nodes(const HistogramBase& hist) {
-        return (1ULL << height(hist)) - 1ULL;
+    static inline std::string node_extension(size_t node_id) {
+        return "node_" + std::to_string(node_id);
     }
 
-    static std::vector<size_t> node_sizes(const HistogramBase& hist);
+    WaveletTreeBase(const HistogramBase& hist);
 
-    inline WaveletTreeBase(const std::string& filename)
-        : m_filename(filename) {
+    inline size_t sigma() const { return m_sigma; }
+    inline size_t height() const { return m_height; }
+    inline size_t num_nodes() const { return (1ULL << m_height) - 1ULL; }
+
+    inline const std::vector<size_t>& node_sizes() const {
+        return m_node_sizes;
     }
 };

@@ -1,35 +1,29 @@
 #pragma once
 
 #include <distwt/common/wt.hpp>
-
-#include <distwt/common/binary_io.hpp>
 #include <distwt/thrill/histogram.hpp>
 
+#include <functional>
 #include <thrill/api/dia.hpp>
-#include <thrill/api/write_binary.hpp>
 
 class WaveletTree : public WaveletTreeBase {
-private:
-    thrill::Context* m_ctx; // current Thrill context
+public:
+    using bv_t = thrill::DIA<uint64_t>;
+    using bits_t = std::vector<bv_t>;
+
+    using ctor_t = std::function<
+        void(bits_t& bits, const WaveletTreeBase& wt)>;
+
+protected:
+    bits_t m_bits; // layout determined by implementation!
 
 public:
-    inline WaveletTree(thrill::Context& ctx, const std::string& filename)
-        : WaveletTreeBase(filename), m_ctx(&ctx) {
+    inline WaveletTree(const Histogram& hist) : WaveletTreeBase(hist) {
     }
 
-    void save_histogram(const Histogram& hist) const;
+    inline WaveletTree(const Histogram& hist, ctor_t construction_algorithm)
+        : WaveletTreeBase(hist) {
 
-    template<typename bv_t>
-    void save_level_bv(size_t level, bv_t&& bv) const {
-        bv.WriteBinary(m_filename + ".lv_" + std::to_string(level+1));
+        construction_algorithm(m_bits, *this);
     }
-
-    template<typename bv_t>
-    void save_node_bv(size_t node_id, bv_t&& bv) const {
-        bv.WriteBinary(m_filename + ".node_" + std::to_string(node_id));
-    }
-
-    Histogram             load_histogram();
-    thrill::DIA<uint64_t> load_level_bv(size_t level);
-    thrill::DIA<uint64_t> load_node_bv(size_t node_id);
 };

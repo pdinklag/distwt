@@ -1,4 +1,7 @@
-#include <distwt/thrill/wt.hpp>
+#include <distwt/common/wt.hpp>
+
+#include <algorithm>
+#include <tlx/math/integer_log2.hpp>
 
 void recursive_node_sizes(
     std::vector<size_t>& sizes,
@@ -18,13 +21,12 @@ void recursive_node_sizes(
     }
 }
 
-std::vector<size_t> WaveletTreeBase::node_sizes(const HistogramBase& hist) {
-    const size_t n = num_nodes(hist);
+WaveletTreeBase::WaveletTreeBase(const HistogramBase& hist)
+    : m_sigma(hist.size()),
+      m_height(tlx::integer_log2_ceil(m_sigma - 1)),
+      m_node_sizes(num_nodes()) {
 
+    // compute node sizes
     auto c = hist.compute_C();
-
-    std::vector<size_t> sizes(n);
-    recursive_node_sizes(sizes, c, 1, 0, n);
-
-    return sizes;
+    recursive_node_sizes(m_node_sizes, c, 1, 0, m_node_sizes.size());
 }

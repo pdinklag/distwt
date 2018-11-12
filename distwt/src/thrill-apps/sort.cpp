@@ -18,9 +18,9 @@
 #include <distwt/common/util.hpp>
 
 #include <distwt/thrill/text.hpp>
-#include <distwt/thrill/wt.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
+#include <distwt/thrill/wt_levelwise.hpp>
 
 void Process(
     thrill::Context& ctx,
@@ -41,17 +41,17 @@ void Process(
     auto etext = ea.transform(rawtext).Cache();
 
     // construct wt
-    const size_t height = WaveletTree::height(hist);
+    WaveletTreeLevelwise wt(hist,
+    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+        const size_t height = wt.height();
+        bits.resize(height);
 
-    WaveletTree wt(ctx, output);
-    {
         auto text = etext;
         for(size_t level = 0; level < height; level++) {
             const size_t rsh = height - 1 - level;
 
             // compute and store BV
-            wt.save_level_bv(level,
-                text.Window(thrill::api::DisjointTag, 64,
+            bits[level] = text.Window(thrill::api::DisjointTag, 64,
                 [rsh](size_t, const std::vector<esym_t>& v) {
                     uint64_t bv = 0;
                     for(size_t i = 0; i < v.size(); i++) {
@@ -62,7 +62,7 @@ void Process(
                     }
                     return bv;
                 })
-            );
+                .Cache();
 
             if(level+1 < height) {
                 text = text.SortStable(
@@ -72,10 +72,11 @@ void Process(
                     }).Collapse();
             }
         }
-    }
+    });
 
-    // store histogram
-    wt.save_histogram(hist);
+    // store to disk
+    hist.save(output + "." + WaveletTreeBase::histogram_extension());
+    wt.save(output);
 }
 
 int main(int argc, const char** argv) {

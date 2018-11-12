@@ -19,31 +19,28 @@
 #include <distwt/common/util.hpp>
 
 #include <distwt/thrill/text.hpp>
-#include <distwt/thrill/wt.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
+#include <distwt/thrill/wt_nodebased.hpp>
 
 template<typename input_t>
 void flatWT(
-    WaveletTree& wt,
+    WaveletTree::bits_t& bits,
+    const WaveletTreeBase& wt,
     const Histogram& hist,
     input_t input) {
 
-    auto node_sizes = WaveletTree::node_sizes(hist);
-    const size_t height = WaveletTree::height(hist);
-
     // proceed level by level
     size_t node_id = 1ULL;
-    for(size_t level = 0; level < height; level++) {
-        const size_t rsh = height - 1ULL - level;
+    for(size_t level = 0; level < wt.height(); level++) {
+        const size_t rsh = wt.height() - 1ULL - level;
         const size_t pref = rsh + 1ULL;
 
         const size_t level_nodes = (1ULL << level);
         for(size_t i = 0; i < level_nodes; i++) {
             // for a symbol to go in this node, its bit prefix of length pref
             // has to be precisely i
-            wt.save_node_bv(node_id++,
-                input
+            bits[(node_id++)-1] = input
                 .Filter([pref, i](const esym_t& c){ return (c >> pref) == i; })
                 .Window(thrill::api::DisjointTag, 64,
                 [rsh](size_t, const std::vector<esym_t>& v) {
@@ -55,7 +52,8 @@ void flatWT(
                         }
                     }
                     return bv;
-                }));
+                })
+                .Cache();
         }
     }
 }
@@ -78,12 +76,16 @@ void Process(
     // transform text
     auto etext = ea.transform(rawtext).Cache();
 
-    // construct wt recursively
-    WaveletTree wt(ctx, output);
-    flatWT(wt, hist, etext);
+    // construct wt
+    WaveletTreeNodebased wt(hist,
+    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+        bits.resize(wt.num_nodes());
+        flatWT(bits, wt, hist, etext);
+    });
 
-    // store additional information to disk
-    wt.save_histogram(hist);
+    // store to disk
+    hist.save(output + "." + WaveletTreeBase::histogram_extension());
+    wt.save(output);
 }
 
 int main(int argc, const char** argv) {

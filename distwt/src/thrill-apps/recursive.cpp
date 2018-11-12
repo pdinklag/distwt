@@ -19,14 +19,15 @@
 #include <distwt/common/util.hpp>
 
 #include <distwt/thrill/text.hpp>
-#include <distwt/thrill/wt.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
 
+#include <distwt/thrill/wt_nodebased.hpp>
+
 template<typename input_t>
 void recursiveWT(
-    WaveletTree& wt,
-    const std::vector<size_t>& node_sizes,
+    WaveletTree::bits_t& bits,
+    const WaveletTreeBase& wt,
     const float lower_threshold,
     const float upper_threshold,
     const size_t original_input_size,
@@ -38,8 +39,7 @@ void recursiveWT(
     const size_t m = (a + b) / 2;
 
     // compute node BV
-    wt.save_node_bv(node_id,
-        input.Window(thrill::api::DisjointTag, 64,
+    bits[node_id - 1] = input.Window(thrill::api::DisjointTag, 64,
         [m](size_t, const std::vector<esym_t>& v) {
             uint64_t bv = 0;
             for(size_t i = 0; i < v.size(); i++) {
@@ -48,20 +48,21 @@ void recursiveWT(
                 }
             }
             return bv;
-        }));
+        })
+        .Cache();
 
     // "parallel split"
     auto balanced_recurse = [&](auto s, size_t id, size_t x, size_t y) {
         if(x < y) {
-            const size_t child_sz = node_sizes[id-1];
+            const size_t child_sz = wt.node_sizes()[id-1];
             const float p = float(child_sz) / float(original_input_size);
             if(lower_threshold < p && p < upper_threshold) {
                 LOG1 << "p = " << p << " for node " << id << " - rebalancing";
-                recursiveWT(wt, node_sizes,
+                recursiveWT(bits, wt,
                     lower_threshold, upper_threshold, original_input_size,
                     id, s.Rebalance().Cache(), x, y);
             } else {
-                recursiveWT(wt, node_sizes,
+                recursiveWT(bits, wt,
                     lower_threshold, upper_threshold, original_input_size,
                     id, s.Cache(), x, y);
             }
@@ -99,24 +100,28 @@ void Process(
     auto etext = ea.transform(rawtext).Cache();
 
     // construct wt recursively
-    WaveletTree wt(ctx, output);
-    auto node_sizes = WaveletTree::node_sizes(hist);
+    WaveletTreeNodebased wt(hist,
+    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+        const size_t num_nodes = wt.num_nodes();
+        bits.resize(num_nodes);
 
-    recursiveWT(
-        wt,
-        node_sizes,
-        lower_threshold,
-        upper_threshold,
-        input_size,
-        1ULL,             // start with root node
-        etext,            // start with full transformed text
-        0, WaveletTree::num_nodes(hist));
-                          // start with [0, (2^h)-1] interval
-                          // this is done to stay compatible with the other
-                          // algorithms -> TODO: any negative side effects?
+        recursiveWT(
+            bits,
+            wt,
+            lower_threshold,
+            upper_threshold,
+            input_size,
+            1ULL,             // start with root node
+            etext,            // start with full transformed text
+            0, num_nodes);
+                              // start with [0, (2^h)-1] interval
+                              // this is done to stay compatible with the other
+                              // algorithms -> TODO: any negative side effects?
+    });
 
-    // store additional information to disk
-    wt.save_histogram(hist);
+    // store to disk
+    hist.save(output + "." + WaveletTreeBase::histogram_extension());
+    wt.save(output);
 }
 
 int main(int argc, const char** argv) {
