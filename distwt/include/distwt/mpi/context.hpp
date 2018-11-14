@@ -6,7 +6,7 @@
 
 class MPIContext {
 private:
-    static constexpr int EXIT_TAG = 0x65786974;
+    static constexpr int EXIT_TAG = 666;
 
     static util::devnull m_devnull;
 
