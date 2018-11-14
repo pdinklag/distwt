@@ -110,8 +110,8 @@ int main(int argc, char** argv) {
     // minimum amount of memory to process texts.
     {
         const size_t required_memory =
-            // bit vector for root node
-            input.local_num() / 8ULL +
+            // bit vectors
+            (wt.height() * input.local_num()) / 8ULL +
             // 2x local effective transformation
             2ULL * input.local_num() * (sizeof(esym_t) / 8ULL);
 
