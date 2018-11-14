@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     // Read command-line
     tlx::CmdlineParser cp;
 
-    size_t rdbufsize = 64ULL * 1024ULL; // default to 64Ki
+    size_t rdbufsize = 1024ULL * 1024ULL; // default to 1Mi
     cp.add_bytes('r', "rbuf", rdbufsize, "File read buffer size.");
 
     std::string input_filename; // required
