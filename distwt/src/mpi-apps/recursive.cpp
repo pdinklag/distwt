@@ -95,7 +95,8 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
-    ctx.cout(ctx.rank() == 0) << "Initialized." << std::endl;
+    ctx.cout(ctx.rank() == 0) <<
+        "Starting computation with " << ctx.num_workers() << " workers ..." << std::endl;
 
     // Get input partition
     FilePartitionReader input(ctx, input_filename);
