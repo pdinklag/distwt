@@ -25,3 +25,16 @@ std::ostream& MPIContext::cout() const {
 std::ostream& MPIContext::cout(bool b) const {
     return b ? cout() : m_devnull;
 }
+
+void MPIContext::exit() {
+    if(m_rank == 0) {
+        // on master, wait for EXIT_TAG message from all other nodes
+        MPI_Status status;
+        for(size_t i = 1; i < m_num_workers; i++) {
+            MPI_Recv(nullptr, 0, MPI_BYTE, (int)i, EXIT_TAG, MPI_COMM_WORLD, &status);
+        }
+    } else {
+        // on all others, send EXIT_TAG message to master
+        MPI_Send(nullptr, 0, MPI_BYTE, 0, EXIT_TAG, MPI_COMM_WORLD);
+    }
+}

@@ -95,14 +95,14 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
-    ctx.cout(ctx.rank() == 0) <<
+    ctx.cout_master() <<
         "Starting computation with " << ctx.num_workers() << " workers ..." << std::endl;
 
     // Get input partition
     FilePartitionReader input(ctx, input_filename);
 
     // Compute histogram
-    ctx.cout(ctx.rank() == 0) << "Compute histogram ..." << std::endl;
+    ctx.cout_master() << "Compute histogram ..." << std::endl;
     Histogram hist(ctx, input, rdbufsize);
 
     // prepare WT
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
             // 2x local effective transformation
             2ULL * input.local_num() * (sizeof(esym_t) / 8ULL);
 
-        ctx.cout(ctx.rank() == 0) << "required_memory: " <<
+        ctx.cout_master() << "required_memory: " <<
             required_memory << " bytes" << std::endl;
     }
 
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
 
     // Transform text and cache in RAM
     {
-        ctx.cout(ctx.rank() == 0) << "Compute effective transformation ..." << std::endl;
+        ctx.cout_master() << "Compute effective transformation ..." << std::endl;
         esym_t* etext = new esym_t[input.local_num()];
         {
             size_t i = 0;
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
         }
 
         // recursive WT
-        ctx.cout(ctx.rank() == 0) << "Compute WT ..." << std::endl;
+        ctx.cout_master() << "Compute WT ..." << std::endl;
         esym_t* buffer = new esym_t[input.local_num()];
         recursiveWT(
             bits,
@@ -151,6 +151,9 @@ int main(int argc, char** argv) {
     }
 
     // Finalize
-    ctx.cout(ctx.rank() == 0) << "Done computing " << bits.size() << " nodes." << std::endl;
+    ctx.cout_master() << "Done computing " << bits.size() << " nodes." << std::endl;
+    ctx.cout_master() << "Waiting for exit signals ..." << std::endl;
+    ctx.exit();
+    ctx.cout_master() << "Finished." << std::endl;
     return 0;
 }

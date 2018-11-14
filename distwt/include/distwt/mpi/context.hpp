@@ -6,6 +6,8 @@
 
 class MPIContext {
 private:
+    static constexpr int EXIT_TAG = 0x65786974;
+
     static util::devnull m_devnull;
 
     int m_num_workers, m_rank;
@@ -20,4 +22,10 @@ public:
 
     std::ostream& cout() const;
     std::ostream& cout(bool b) const;
+
+    inline std::ostream& cout_master() const {
+        return cout(m_rank == 0);
+    }
+
+    void exit();
 };
