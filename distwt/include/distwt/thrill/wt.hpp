@@ -26,4 +26,11 @@ public:
 
         construction_algorithm(m_bits, *this);
     }
+
+    inline void ensure() {
+        for(auto& bv : m_bits) {
+            // Force computation
+            bv.Execute();
+        }
+    }
 };
