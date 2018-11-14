@@ -95,11 +95,13 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
+    ctx.cout(ctx.rank() == 0) << "Initialized." << std::endl;
 
     // Get input partition
     FilePartitionReader input(ctx, input_filename);
 
     // Compute histogram
+    ctx.cout(ctx.rank() == 0) << "Compute histogram ..." << std::endl;
     Histogram hist(ctx, input, rdbufsize);
 
     // prepare WT
@@ -124,6 +126,7 @@ int main(int argc, char** argv) {
 
     // Transform text and cache in RAM
     {
+        ctx.cout(ctx.rank() == 0) << "Compute effective transformation ..." << std::endl;
         esym_t* etext = new esym_t[input.local_num()];
         {
             size_t i = 0;
@@ -131,6 +134,7 @@ int main(int argc, char** argv) {
         }
 
         // recursive WT
+        ctx.cout(ctx.rank() == 0) << "Compute WT ..." << std::endl;
         esym_t* buffer = new esym_t[input.local_num()];
         recursiveWT(
             bits,
@@ -145,9 +149,7 @@ int main(int argc, char** argv) {
         delete[] etext;
     }
 
-    // TODO: bit vectors now available in RAM
-
     // Finalize
-    ctx.cout() << "Done computing " << bits.size() << " nodes." << std::endl;
+    ctx.cout(ctx.rank() == 0) << "Done computing " << bits.size() << " nodes." << std::endl;
     return 0;
 }
