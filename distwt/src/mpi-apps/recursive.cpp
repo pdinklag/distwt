@@ -87,6 +87,9 @@ int main(int argc, char** argv) {
     size_t rdbufsize = 1024ULL * 1024ULL; // default to 1Mi
     cp.add_bytes('r', "rbuf", rdbufsize, "File read buffer size.");
 
+    std::string local_filename("");
+    cp.add_string('l', "local", local_filename, "Name of local part file.");
+
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
     if (!cp.process(argc, argv)) {
@@ -98,8 +101,20 @@ int main(int argc, char** argv) {
     ctx.cout_master() <<
         "Starting computation with " << ctx.num_workers() << " workers ..." << std::endl;
 
-    // Get input partition
+    // Determine input partition
     FilePartitionReader input(ctx, input_filename);
+
+    if(local_filename.length() > 0) {
+        // Extract local part
+        ctx.cout_master() << "Extract partition to "
+            << local_filename << " ..." << std::endl;
+
+        input.extract_local(local_filename, rdbufsize);
+
+        // Synchronize
+        ctx.cout_master() << "Synchronizing ..." << std::endl;
+        ctx.synchronize();
+    }
 
     // Compute histogram
     ctx.cout_master() << "Compute histogram ..." << std::endl;

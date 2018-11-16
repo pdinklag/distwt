@@ -9,7 +9,7 @@
 FilePartitionReader::FilePartitionReader(
     const MPIContext& ctx,
     const std::string& filename)
-    : m_filename(filename) {
+    : m_filename(filename), m_rank(ctx.rank()), m_extracted(false) {
 
     m_total_size = util::file_size(m_filename);
     const size_t sz_per_worker = tlx::div_ceil(
@@ -22,27 +22,77 @@ FilePartitionReader::FilePartitionReader(
     m_local_num = local_end - m_local_offset;
 }
 
+bool FilePartitionReader::extract_local(
+    const std::string& filename, size_t bufsize) {
+
+    if(!m_extracted) {
+        m_local_filename = filename + ".part." + std::to_string(m_rank);
+        {
+            // init write buffer
+            char *buf = new char[bufsize];
+            size_t buf_pos = 0;
+
+            // extract local part
+            {
+                std::ofstream out(m_local_filename, std::ios::binary);
+                process_local([&](unsigned char c){
+                    buf[buf_pos++] = (char)c;
+
+                    // write overflowing buffer
+                    if(buf_pos >= bufsize) {
+                        out.write(buf, bufsize);
+                        buf_pos = 0;
+                    }
+                }, bufsize);
+
+                // write remainder
+                if(buf_pos > 0) {
+                    out.write(buf, buf_pos);
+                }
+            }
+
+            // clean up
+            delete[] buf;
+        }
+
+        m_extracted = true;
+        return true;
+    } else {
+        return false;
+    }
+}
+
 void FilePartitionReader::process_local(
     std::function<void(unsigned char)> func, size_t bufsize) const {
-
-    // open stream and seek position
-    std::ifstream in(m_filename, std::ios::binary);
-    in.seekg(m_local_offset);
 
     // initialize read buffer
     char *buf = new char[bufsize];
     size_t buf_count = 0, buf_pos = 0;
 
-    // process
-    for(size_t read = 0; read < m_local_num; read++) {
-        // fill underflowing buffer
-        if(buf_pos >= buf_count) {
-            buf_count = std::min(bufsize, m_local_num - read);
-            in.read(buf, buf_count);
-            buf_pos = 0;
+    {
+        // open stream and seek position
+        std::ifstream in;
+
+        if(m_extracted) {
+            // part was extracted - open local file
+            in = std::ifstream(m_local_filename, std::ios::binary);
+        } else {
+            // open original file and seek position
+            in = std::ifstream(m_filename, std::ios::binary);
+            in.seekg(m_local_offset);
         }
 
-        func((unsigned char)buf[buf_pos++]);
+        // process
+        for(size_t read = 0; read < m_local_num; read++) {
+            // fill underflowing buffer
+            if(buf_pos >= buf_count) {
+                buf_count = std::min(bufsize, m_local_num - read);
+                in.read(buf, buf_count);
+                buf_pos = 0;
+            }
+
+            func((unsigned char)buf[buf_pos++]);
+        }
     }
 
     // clean up

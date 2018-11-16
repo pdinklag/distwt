@@ -9,7 +9,10 @@ private:
     std::string m_filename;
     size_t m_total_size;
 
-    size_t m_local_offset, m_local_num;
+    size_t m_rank, m_local_offset, m_local_num;
+
+    bool m_extracted;
+    std::string m_local_filename;
 
 public:
     FilePartitionReader(const MPIContext& ctx, const std::string& filename);
@@ -19,6 +22,8 @@ public:
 
     inline size_t local_offset() const { return m_local_offset; }
     inline size_t local_num() const { return m_local_num; }
+
+    bool extract_local(const std::string& local_filename, size_t bufsize);
 
     void process_local(
         std::function<void(unsigned char)> func, size_t bufsize) const;
