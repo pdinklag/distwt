@@ -1,6 +1,7 @@
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
+#include <tlx/math/div_ceil.hpp>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/context.hpp>
@@ -122,7 +123,8 @@ int main(int argc, char** argv) {
 
     // prepare WT
     WaveletTreeBase wt(hist);
-    bits_t bits(wt.num_nodes());
+    const size_t num_nodes = wt.num_nodes();
+    bits_t nodes(num_nodes);
 
     // FIXME: Right now, nothing is externalized, therefore we need some
     // minimum amount of memory to process texts.
@@ -153,11 +155,11 @@ int main(int argc, char** argv) {
         ctx.cout_master() << "Compute WT ..." << std::endl;
         esym_t* buffer = new esym_t[input.local_num()];
         recursiveWT(
-            bits,
+            nodes,
             ctx,
             1ULL, // root
             etext, input.local_num(), // text
-            0ULL, wt.num_nodes(), // interval
+            0ULL, num_nodes, // interval
             buffer); // work buffer
 
         // Clean up
@@ -165,8 +167,106 @@ int main(int argc, char** argv) {
         delete[] etext;
     }
 
-    // Finalize
-    ctx.cout_master() << "Done computing " << bits.size() << " nodes." << std::endl;
+    // Synchronize
+    ctx.cout_master() << "Done computing " << nodes.size()
+        << " nodes. Synchronizing ..." << std::endl;
+    ctx.synchronize();
+
+    // Distribute local offsets for all nodes
+    {
+        ctx.cout_master() << "Distributing node prefix sums ..." << std::endl;
+
+        auto& node_sizes = wt.node_sizes();
+        std::vector<size_t> local_node_offs(num_nodes);
+        {
+            // compute local node sizes
+            std::vector<size_t> sz(num_nodes);
+            for(size_t i = 0; i < num_nodes; i++) {
+                sz[i] = nodes[i].size();
+            }
+
+            // send sizes to workers with higher rank
+            for(size_t to = ctx.rank() + 1; to < ctx.num_workers(); to++) {
+                MPI_Send(sz.data(), sz.size(), MPI_LONG_LONG, (int)to, 0, MPI_COMM_WORLD);
+            }
+
+            // receive sizes from workers with lower rank
+            MPI_Status status;
+            for(size_t from = 0; from < ctx.rank(); from++) {
+                MPI_Recv(sz.data(), num_nodes, MPI_LONG_LONG, (int)from, 0, MPI_COMM_WORLD, &status);
+
+                // compute prefix sum
+                for(size_t i = 0; i < num_nodes; i++) {
+                    local_node_offs[i] += sz[i];
+                }
+            }
+        }
+
+        // Convert to level-wise representation
+        // balanced, so that each worker has an equal amount of bits for each level
+        {
+            // prepare send / receive vectors
+            const size_t bits_per_worker = input.local_num();
+
+            // note: nothing to do for the root level!
+            for(size_t level = 1; level < wt.height(); level++) {
+                // do this level by level
+                const size_t num_level_nodes = 1ULL << level;
+                const size_t first_level_node = num_level_nodes;
+
+                // determine which bits from this worker go to other workers
+                size_t node_offs = 0;
+                for(size_t i = 0; i < num_level_nodes; i++) {
+                    const size_t node_id = first_level_node + i;
+
+                    auto& bv = nodes[node_id-1];
+
+                    // find range of the local node's bit vector
+                    // in global level's bit vector
+                    const size_t my_first = node_offs + local_node_offs[node_id-1];
+                    const size_t my_last = my_first + bv.size() - 1;
+
+                    // to each worker, send the correspondig bits from the
+                    // global level's bit vector (or zero)
+                    for(size_t to = 0; to < ctx.num_workers(); to++) {
+                        const size_t first = to * bits_per_worker;
+                        const size_t last  = first + bits_per_worker - 1;
+
+                        // is my local range part of the worker's global range?
+                        const size_t p = std::max(first, my_first);
+                        const size_t q = std::min(last, my_last);
+                        if(p < q) {
+                            // yep, send corresponding bits
+                            // note: also send to self - this makes sure that
+                            //       the ordering is correct later
+
+                            // TODO: send bv[p..q]
+                            ctx.cout() << "Send [" << p << "," << q
+                                << "] of node " << node_id << " to " << to
+                                << std::endl;
+                        } else {
+                            // nope, send nothing
+                        }
+                    }
+
+                    // discard bit vector
+                    bv.clear();
+                    bv.shrink_to_fit();
+
+                    // advance
+                    node_offs += node_sizes[node_id-1];
+                }
+
+                // receive partial bit vectors from all workers (incl. self!)
+                // and concatenate
+                for(size_t from = 0; from < ctx.num_workers(); from++) {
+                    // TODO: receive bv and append to local level bv
+                }
+            }
+        }
+    }
+
+    // Exit
     ctx.cout_master() << "Waiting for exit signals ..." << std::endl;
     ctx.exit();
     ctx.cout_master() << "Finished." << std::endl;
