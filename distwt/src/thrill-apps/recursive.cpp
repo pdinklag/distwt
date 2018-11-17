@@ -119,6 +119,16 @@ void Process(
                               // algorithms -> TODO: any negative side effects?
     });
 
+    // TODO: Convert to WaveletTreeLevelwise
+    // for each level l:
+    //   - for each node on level l:
+    //     - zip 64-bit blocks with indices (ZipWithIndex + node offset)
+    //   - union indexed blocks (Union) to level
+    //   - sort blocks by indices (Sort)
+    //   - process indexed blocks using a 2-block window (Window), removing
+    //     (a) the indices
+    //     (b) any leftover alignment bits
+
     if(output.length() > 0) {
         // store to disk
         hist.save(output + "." + WaveletTreeBase::histogram_extension());
