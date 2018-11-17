@@ -7,7 +7,7 @@
 class FilePartitionReader {
 private:
     std::string m_filename;
-    size_t m_total_size;
+    size_t m_total_size, m_size_per_worker;
 
     size_t m_rank, m_local_offset, m_local_num;
 
@@ -19,6 +19,7 @@ public:
 
     inline const std::string& filename() const { return m_filename; }
     inline size_t total_size() const { return m_total_size; }
+    inline size_t size_per_worker() const { return m_size_per_worker; }
 
     inline size_t local_offset() const { return m_local_offset; }
     inline size_t local_num() const { return m_local_num; }
