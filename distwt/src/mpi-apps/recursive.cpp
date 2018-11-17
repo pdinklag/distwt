@@ -1,7 +1,6 @@
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
-#include <tlx/math/div_ceil.hpp>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/context.hpp>
@@ -10,59 +9,9 @@
 #include <distwt/common/wt.hpp>
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
+#include <distwt/mpi/bit_vector.hpp>
 
-using bv_t = std::vector<bool>;
 using bits_t = std::vector<bv_t>;
-
-#include <bitset>
-
-size_t pack_bv(const bv_t& bv, size_t p, const size_t num, uint64_t*& buf) {
-    const size_t bufsize = 1ULL + tlx::div_ceil(num, 64ULL);
-    buf = new uint64_t[bufsize];
-
-    // pack length into first item
-    buf[0] = num;
-
-    // encode bits
-    const uint64_t q = p + num;
-
-    std::bitset<64> bits;
-    size_t i = 1, x = 0;
-    while(p < q) {
-        bits[x++] = bv[p++];
-        if(x >= 64ULL) {
-            buf[i++] = bits.to_ullong();
-            x = 0;
-            bits.reset();
-        }
-    }
-
-    // encode remaining bits
-    if(x > 0) {
-        buf[i] = bits.to_ullong();
-    }
-
-    return bufsize;
-}
-
-size_t unpack_bv(const uint64_t* buf, bv_t& bv, size_t p) {
-    const size_t num = buf[0];
-    const size_t q = p + num;
-
-    // decode bits
-    size_t i = 1, x = 0;
-    std::bitset<64> bits = buf[i++];
-
-    while(p < q) {
-        bv[p++] = bv[x++];
-        if(x >= 64ULL) {
-            bits = buf[i++];
-            x = 0;
-        }
-    }
-
-    return num;
-}
 
 void recursiveWT(
     bits_t& bits,
@@ -154,6 +103,7 @@ int main(int argc, char** argv) {
 
     // Determine input partition
     FilePartitionReader input(ctx, input_filename);
+    const size_t local_num = input.local_num();
 
     if(local_filename.length() > 0) {
         // Extract local part
@@ -183,7 +133,7 @@ int main(int argc, char** argv) {
             // bit vectors
             (wt.height() * input.local_num()) / 8ULL +
             // 2x local effective transformation
-            2ULL * input.local_num() * (sizeof(esym_t) / 8ULL);
+            2ULL * local_num * (sizeof(esym_t) / 8ULL);
 
         ctx.cout_master() << "required_memory: " <<
             required_memory << " bytes" << std::endl;
@@ -195,7 +145,7 @@ int main(int argc, char** argv) {
     // Transform text and cache in RAM
     {
         ctx.cout_master() << "Compute effective transformation ..." << std::endl;
-        esym_t* etext = new esym_t[input.local_num()];
+        esym_t* etext = new esym_t[local_num];
         {
             size_t i = 0;
             ea.transform(input, [&](esym_t x){ etext[i++] = x; }, rdbufsize);
@@ -203,12 +153,12 @@ int main(int argc, char** argv) {
 
         // recursive WT
         ctx.cout_master() << "Compute WT ..." << std::endl;
-        esym_t* buffer = new esym_t[input.local_num()];
+        esym_t* buffer = new esym_t[local_num];
         recursiveWT(
             nodes,
             ctx,
             1ULL, // root
-            etext, input.local_num(), // text
+            etext, local_num, // text
             0ULL, num_nodes, // interval
             buffer); // work buffer
 
@@ -218,9 +168,11 @@ int main(int argc, char** argv) {
     }
 
     // DEBUG
+    /*
     for(size_t node = 0; node < wt.num_nodes(); node++) {
         ctx.cout() << "node " << (node+1) << ": " << nodes[node] << std::endl;
     }
+    */
 
     // Synchronize
     ctx.cout_master() << "Done computing " << nodes.size()
@@ -265,123 +217,172 @@ int main(int argc, char** argv) {
         }
 
         // Part 2 - Distribute bits in a balanced manner
+        ctx.cout_master() << "Distributing level bit vectors ..." << std::endl;
         {
             // prepare send / receive vectors
-            const size_t bits_per_worker = input.local_num();
+            const size_t bits_per_worker = input.size_per_worker();
 
             // note: nothing to do for the root level!
             for(size_t level = 1; level < wt.height(); level++) {
+                ctx.cout_master() << "level " << (level+1) << " ..." << std::endl;
+
                 // do this level by level
                 const size_t num_level_nodes = 1ULL << level;
                 const size_t first_level_node = num_level_nodes;
 
-                // buffer for self-sending
-                uint64_t* sent_self = nullptr;
+                // messages to self
+                // buffer needs to be of fixed size to avoid destructor calls
+                std::vector<bv_interval_msg_t> msg_self(num_level_nodes);
+
+                std::vector<bv_interval_msg_t> msg_outbox(2ULL * num_level_nodes);
+                size_t msg_out_num = 0;
 
                 // determine which bits from this worker go to other workers
-                size_t node_offs = 0;
+                size_t level_node_offs = 0;
                 for(size_t i = 0; i < num_level_nodes; i++) {
                     const size_t node_id = first_level_node + i;
 
                     auto& bv = nodes[node_id-1];
+                    if(bv.size() > 0) {
+                        const size_t glob_node_offs =
+                            level_node_offs + local_node_offs[node_id-1];
 
-                    // find range of the local node's bit vector
-                    // in global level's bit vector
-                    const size_t my_first = node_offs + local_node_offs[node_id-1];
-                    const size_t my_last = my_first + bv.size() - 1;
+                        // sender
+                        auto send = [&](const size_t target,
+                            const bv_t& bv,size_t p, size_t q){
 
-                    // to each worker, send the correspondig bits from the
-                    // global level's bit vector (or zero)
-                    for(size_t to = 0; to < ctx.num_workers(); to++) {
-                        const size_t first = to * bits_per_worker;
-                        const size_t last  = first + bits_per_worker - 1;
+                            const size_t num = q - p + 1;
+                            const size_t local_p = p - glob_node_offs;
+                            const size_t local_q = local_p + num - 1;
 
-                        // is my local range part of the worker's global range?
-                        const size_t p = std::max(first, my_first);
-                        const size_t q = std::min(last, my_last);
-                        if(p < q) {
-                            // yep, send corresponding bits
-                            const size_t send_off = p - my_first;
-                            const size_t send_num = q - p;
+                            /*
+                            ctx.cout() << "Send [" << p << "," << q << "] ("
+                                << "local [" << local_p << "," << local_q << "]) ("
+                                << num << " bits) of level " << (level+1)
+                                << " (node " << node_id << ")"
+                                << " to #" << target << std::endl;
+                            */
 
-                            if(to == ctx.rank()) {
+                            if(target == ctx.rank()) {
                                 // send to self
-                                pack_bv(bv, send_off, send_num, sent_self);
+                                encode_bv_interval_msg(
+                                    msg_self[i], bv, local_p, local_q, p, q);
                             } else {
-                                // send to other
-                                uint64_t* buf;
-                                size_t size = pack_bv(bv, send_off, send_num, buf);
+                                MPI_Request req;
 
-                                /*ctx.cout() << "Sending " << q-p << " bits to "
-                                    << to << " for level " << level
-                                    << std::endl;*/
+                                auto& msg = msg_outbox[msg_out_num++];
 
-                                MPI_Send(buf, size, MPI_LONG_LONG,
-                                    (int)to, (int)level, MPI_COMM_WORLD);
+                                encode_bv_interval_msg(
+                                    msg, bv, local_p, local_q, p, q);
 
-                                delete[] buf;
+                                MPI_Isend(msg.data, msg.size, MPI_LONG_LONG,
+                                    (int)target, (int)level, MPI_COMM_WORLD,
+                                    &req);
                             }
+                        };
+
+                        // find range of the local node's bit vector
+                        // in global level's bit vector
+                        const size_t p = glob_node_offs;
+                        const size_t q = p + bv.size() - 1;
+
+                        // find target workers for my local range
+                        // LEMMA: there can be at most two of them, because the node
+                        //        has at most bits_per_worker bits
+                        const size_t target1 = p / bits_per_worker;
+                        const size_t target2 = q / bits_per_worker;
+
+                        if(target1 == target2) {
+                            // send bv[p..q] bits to target
+                            send(target1, bv, p, q);
                         } else {
-                            // nope, send nothing
-                            if(to == ctx.rank()) {
-                                // just keep sent_self as nullptr
-                            } else {
-                                MPI_Send(nullptr, 0, MPI_LONG_LONG,
-                                    (int)to, (int)level, MPI_COMM_WORLD);
-                            }
-                        }
-                    }
+                            // split it up at the boundary m
+                            const size_t m = target2 * bits_per_worker;
 
-                    // discard node bit vector
-                    bv.clear();
-                    bv.shrink_to_fit();
+                            // send bv[p..m-1] to target1
+                            send(target1, bv, p, m-1);
+
+                            // send bv[m..q] to target2
+                            send(target2, bv, m, q);
+                        }
+
+                        // discard node bit vector
+                        bv.clear();
+                        bv.shrink_to_fit();
+                    }
 
                     // advance
-                    node_offs += node_sizes[node_id-1];
+                    level_node_offs += node_sizes[node_id-1];
                 }
 
-                // receive partial bit vectors from all workers (incl. self!)
-                // and concatenate
-                levels[level].resize(bits_per_worker);
+                // allocate level bv
+                levels[level].resize(local_num);
 
-                for(size_t from = 0; from < ctx.num_workers(); from++) {
-                    size_t p = 0;
-                    if(from == ctx.rank()) {
-                        if(sent_self) {
-                            // receive from self
-                            p += unpack_bv(sent_self, levels[level], p);
-                            delete[] sent_self;
-                        }
-                    } else {
-                        // receive from other
-                        MPI_Status status;
-                        MPI_Probe((int)from, (int)level, MPI_COMM_WORLD, &status);
+                // receiver
+                size_t bits_received = 0;
 
-                        int bufsize;
-                        MPI_Get_count(&status, MPI_LONG_LONG, &bufsize);
-                        if(bufsize > 0) {
-                            uint64_t* buf = new uint64_t[bufsize];
-                            MPI_Recv(buf, bufsize, MPI_LONG_LONG,
-                                (int)from, (int)level, MPI_COMM_WORLD, &status);
+                const size_t glob_offs = ctx.rank() * bits_per_worker;
+                auto recv = [&](const bv_interval_msg_t& msg, const size_t source){
+                    // DEBUG
+                    /*
+                    const size_t p = msg.data[0];
+                    const size_t q = msg.data[1];
+                    const size_t num = q-p+1;
+                    ctx.cout() << "Receive [" << p << "," << q
+                        << "] (" << num << " bits) of level " << (level+1)
+                        << " from #" << source
+                        << " (glob_offs = " << glob_offs << ")" << std::endl;
+                    */
 
-                            // unpack and append to local level bv
-                            p += unpack_bv(buf, levels[level], p);
+                    bits_received += decode_bv_interval_msg(
+                        msg, levels[level], glob_offs);
 
-                            /*ctx.cout() << "Received " << bufsize - 1 << " bits"
-                                    << " from " << from << " for level " << level
-                                    << std::endl;*/
+                    // DEBUG
+                    /*
+                    ctx.cout() << "got " << bits_received << " / "
+                        << local_num << " bits" << std::endl;
+                    */
+                };
 
-                            delete[] buf;
-                        }
+                // receive messages sent to self first
+                {
+                    for(auto& msg : msg_self) {
+                        if(msg) recv(msg, ctx.rank());
                     }
                 }
+
+                // now receive messages from other nodes until
+                // local_num bits have been received
+                while(bits_received < local_num) {
+                    MPI_Status status;
+                    MPI_Probe(
+                        MPI_ANY_SOURCE,
+                        (int)level,
+                        MPI_COMM_WORLD,
+                        &status);
+
+                    int size;
+                    MPI_Get_count(&status, MPI_LONG_LONG, &size);
+
+                    if(size > 0) {
+                        bv_interval_msg_t msg(size);
+                        MPI_Recv(msg.data, msg.size, MPI_LONG_LONG,
+                            status.MPI_SOURCE,
+                            (int)level,
+                            MPI_COMM_WORLD,
+                            &status);
+
+                        recv(msg, status.MPI_SOURCE);
+                    }
+                }
+
+                // DEBUG
+                ctx.synchronize();
+                /*
+                ctx.cout() << "level " << (level+1) << ": " << levels[level] << std::endl;
+                */
             }
         }
-    }
-
-    // DEBUG
-    for(size_t level = 0; level < wt.height(); level++) {
-        ctx.cout() << "level " << (level+1) << ": " << levels[level] << std::endl;
     }
 
     // Exit

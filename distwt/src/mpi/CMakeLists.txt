@@ -1,5 +1,6 @@
 add_library(distwt-mpi
 
+    bit_vector.cpp
     context.cpp
     effective_alphabet.cpp
     histogram.cpp
