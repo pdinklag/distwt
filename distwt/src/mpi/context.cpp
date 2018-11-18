@@ -27,35 +27,5 @@ std::ostream& MPIContext::cout(bool b) const {
 }
 
 void MPIContext::synchronize() {
-    MPI_Status status;
-    if(is_master()) {
-        // on master, wait for ready message from all other nodes
-        for(size_t i = 1; i < m_num_workers; i++) {
-            MPI_Recv(nullptr, 0, MPI_BYTE, (int)i, SYNC_RDY_TAG, MPI_COMM_WORLD, &status);
-        }
-
-        // once all ready messages are there, dispatch ack messages
-        for(size_t i = 1; i < m_num_workers; i++) {
-            MPI_Send(nullptr, 0, MPI_BYTE, (int)i, SYNC_ACK_TAG, MPI_COMM_WORLD);
-        }
-    } else {
-        // on all others, first send ready message to master
-        MPI_Send(nullptr, 0, MPI_BYTE, 0, SYNC_RDY_TAG, MPI_COMM_WORLD);
-
-        // then wait for ack from master
-        MPI_Recv(nullptr, 0, MPI_BYTE, 0, SYNC_ACK_TAG, MPI_COMM_WORLD, &status);
-    }
-}
-
-void MPIContext::exit() {
-    if(is_master()) {
-        // on master, wait for EXIT_TAG message from all other nodes
-        MPI_Status status;
-        for(size_t i = 1; i < m_num_workers; i++) {
-            MPI_Recv(nullptr, 0, MPI_BYTE, (int)i, EXIT_TAG, MPI_COMM_WORLD, &status);
-        }
-    } else {
-        // on all others, send EXIT_TAG message to master
-        MPI_Send(nullptr, 0, MPI_BYTE, 0, EXIT_TAG, MPI_COMM_WORLD);
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
 }

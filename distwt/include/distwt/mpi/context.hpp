@@ -33,5 +33,4 @@ public:
     }
 
     void synchronize();
-    void exit();
 };

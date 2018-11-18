@@ -387,7 +387,7 @@ int main(int argc, char** argv) {
 
     // Exit
     ctx.cout_master() << "Waiting for exit signals ..." << std::endl;
-    ctx.exit();
+    ctx.synchronize();
     ctx.cout_master() << "Finished." << std::endl;
     return 0;
 }
