@@ -8,17 +8,17 @@
 class WaveletTreeLevelwise : public WaveletTree {
 public:
     inline WaveletTreeLevelwise(
-        const Histogram& hist,
+        const HistogramBase& hist,
         ctor_t construction_algorithm)
         : WaveletTree(hist, construction_algorithm) {
     }
 
     WaveletTreeLevelwise(
-        const Histogram& hist,
+        const HistogramBase& hist,
         thrill::Context& ctx,
         const std::string& filename);
 
     void save(const std::string& filename);
 
-    rawtext_t decode(thrill::Context& ctx, const Histogram& hist);
+    rawtext_t decode(thrill::Context& ctx, const HistogramBase& hist);
 };

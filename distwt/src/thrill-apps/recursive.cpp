@@ -23,6 +23,7 @@
 #include <distwt/thrill/effective_alphabet.hpp>
 
 #include <distwt/thrill/wt_nodebased.hpp>
+#include <distwt/thrill/wt_levelwise.hpp>
 
 template<typename input_t>
 void recursiveWT(
@@ -100,7 +101,7 @@ void Process(
     auto etext = ea.transform(rawtext).Cache();
 
     // construct wt recursively
-    WaveletTreeNodebased wt(hist,
+    WaveletTreeNodebased wt_nodes(hist,
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
         const size_t num_nodes = wt.num_nodes();
         bits.resize(num_nodes);
@@ -119,15 +120,8 @@ void Process(
                               // algorithms -> TODO: any negative side effects?
     });
 
-    // TODO: Convert to WaveletTreeLevelwise
-    // for each level l:
-    //   - for each node on level l:
-    //     - zip 64-bit blocks with indices (ZipWithIndex + node offset)
-    //   - union indexed blocks (Union) to level
-    //   - sort blocks by indices (Sort)
-    //   - process indexed blocks using a 2-block window (Window), removing
-    //     (a) the indices
-    //     (b) any leftover alignment bits
+    // Merge to WaveletTreeLevelwise
+    auto wt = wt_nodes.merge(ctx, hist);
 
     if(output.length() > 0) {
         // store to disk

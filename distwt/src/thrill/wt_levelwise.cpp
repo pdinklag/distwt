@@ -14,7 +14,7 @@
 #include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeLevelwise::WaveletTreeLevelwise(
-    const Histogram& hist,
+    const HistogramBase& hist,
     thrill::Context& ctx,
     const std::string& filename) : WaveletTree(hist) {
 
@@ -32,7 +32,7 @@ void WaveletTreeLevelwise::save(const std::string& filename) {
 }
 
 rawtext_t WaveletTreeLevelwise::decode(
-    thrill::Context& ctx, const Histogram& hist) {
+    thrill::Context& ctx, const HistogramBase& hist) {
 
     // indexed symbol
     using esym_index_t = std::pair<esym_t, size_t>;
