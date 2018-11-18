@@ -1,7 +1,7 @@
 #include <iostream>
 #include <tuple>
 
-#include <tlx/math/integer_log2.hpp>
+#include <tlx/cmdline_parser.hpp>
 
 #include <thrill/api/dia.hpp>
 
@@ -74,20 +74,36 @@ void Process(
         }
     });
 
-    // store to disk
-    hist.save(output + "." + WaveletTreeBase::histogram_extension());
-    wt.save(output);
+    if(output.length() > 0) {
+        // store to disk
+        hist.save(output + "." + WaveletTreeBase::histogram_extension());
+        wt.save(output);
+    } else {
+        // make sure to actually compute the wavelet tree
+        wt.ensure();
+    }
 }
 
 int main(int argc, const char** argv) {
-    // basic argument parsing
-    if (argc < 3) {
-        std::cout << "Usage: " << argv[0] << " <input> <output>" << std::endl;
+    // Read command-line
+    tlx::CmdlineParser cp;
+
+    std::string input_filename; // required
+    std::string output_filename = "";
+
+    cp.add_param_string("file", input_filename, "The input file.");
+    cp.add_string('o', "out", output_filename, "The base output filename.");
+
+    if (!cp.process(argc, argv)) {
         return -1;
     }
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
-        Process(ctx, argv[1], util::file_size(argv[1]), argv[2]);
+        Process(
+            ctx,
+            input_filename,
+            util::file_size(input_filename),
+            output_filename);
     });
 }

@@ -120,7 +120,7 @@ void Process(
                               // algorithms -> TODO: any negative side effects?
     });
 
-    // Merge to WaveletTreeLevelwise
+    // Merge to levelwise wavelet tree
     auto wt = wt_nodes.merge(ctx, hist);
 
     if(output.length() > 0) {

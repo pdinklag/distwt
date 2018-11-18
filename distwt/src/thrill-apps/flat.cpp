@@ -1,7 +1,7 @@
 #include <iostream>
 #include <tuple>
 
-#include <tlx/math/integer_log2.hpp>
+#include <tlx/cmdline_parser.hpp>
 
 #include <thrill/api/dia.hpp>
 
@@ -22,6 +22,7 @@
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
 #include <distwt/thrill/wt_nodebased.hpp>
+#include <distwt/thrill/wt_levelwise.hpp>
 
 template<typename input_t>
 void flatWT(
@@ -76,28 +77,47 @@ void Process(
     // transform text
     auto etext = ea.transform(rawtext).Cache();
 
-    // construct wt
-    WaveletTreeNodebased wt(hist,
+    // construct node-based wt
+    WaveletTreeNodebased wt_nodes(hist,
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
         bits.resize(wt.num_nodes());
         flatWT(bits, wt, hist, etext);
     });
 
-    // store to disk
-    hist.save(output + "." + WaveletTreeBase::histogram_extension());
-    wt.save(output);
+    // Merge to levelwise wavelet tree
+    auto wt = wt_nodes.merge(ctx, hist);
+
+    if(output.length() > 0) {
+        // store to disk
+        hist.save(output + "." + WaveletTreeBase::histogram_extension());
+        wt.save(output);
+    } else {
+        // make sure to actually compute the wavelet tree
+        wt.ensure();
+    }
 }
 
 int main(int argc, const char** argv) {
-    // basic argument parsing
-    if (argc < 3) {
-        std::cout << "Usage: " << argv[0] << " <input> <output>" << std::endl;
+    // Read command-line
+    tlx::CmdlineParser cp;
+
+    std::string input_filename; // required
+    std::string output_filename = "";
+
+    cp.add_param_string("file", input_filename, "The input file.");
+    cp.add_string('o', "out", output_filename, "The base output filename.");
+
+    if (!cp.process(argc, argv)) {
         return -1;
     }
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
-        Process(ctx, argv[1], util::file_size(argv[1]), argv[2]);
+        Process(
+            ctx,
+            input_filename,
+            util::file_size(input_filename),
+            output_filename);
     });
 }
 
