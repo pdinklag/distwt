@@ -7,17 +7,15 @@
 #include <thrill/api/concat.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/read_binary.hpp>
+#include <thrill/api/rebalance.hpp>
 #include <thrill/api/sort.hpp>
 #include <thrill/api/union.hpp>
 #include <thrill/api/write_binary.hpp>
 #include <thrill/api/zip.hpp>
 #include <thrill/api/zip_with_index.hpp>
 
-#include <distwt/thrill/dia_prefix.hpp>
-
-// DEBUG
 #include <distwt/thrill/bitset.hpp>
-#include <thrill/api/print.hpp>
+#include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeNodebased::WaveletTreeNodebased(
     const HistogramBase& hist,
@@ -138,6 +136,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
             using indexed_block_t = std::pair<size_t, uint64_t>;
 
             std::vector<thrill::DIA<indexed_block_t>> indexed(num_level_nodes);
+            std::vector<size_t> blocks(num_level_nodes);
 
             size_t level_node_offs = 0;
             for(size_t i = 0; i < num_level_nodes; i++) {
@@ -152,55 +151,56 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                 const size_t sz = m_node_sizes[node_id-1];
                 const size_t num_blocks = tlx::div_ceil(sz, 64ULL);
 
+                blocks[i] = (i > 0) ? (blocks[i-1] + num_blocks) : num_blocks;
+
                 // advance
                 level_node_offs += num_blocks;
             }
 
-            // union indexed blocks to level and sort by indices
-
-            // DEBUG
-            auto x = thrill::api::Union(indexed)
+            bits[level] =
+                thrill::api::Union(indexed) // union indexed blocks to level
                 .Sort([](const indexed_block_t& a, const indexed_block_t& b){
+                    //sort by indices
                     return a.first < b.first;
-                });
-            x.Print("x");
-
-            bits[level] = x.template FlatWindow<uint64_t>(2,
-                [&](
+                })
+                .template FlatWindow<bool>(1,
+                [this,first_level_node,blocks](
                     size_t rank,
                     const thrill::common::RingBuffer<indexed_block_t>& v,
                     auto emit){
 
-                    // TODO: ???
-                    emit(v[0].second);
-                },
-                [&](
-                    size_t rank,
-                    const thrill::common::RingBuffer<indexed_block_t>& v,
-                    auto emit){
+                    // remove alignments
+                    // TODO: is there any way to do this not via a bool DIA?
 
-                    // TODO: ???
-                    emit(v[0].second);
-                });
+                    // find node that current block belongs to
+                    size_t i = 0;
+                    while(blocks[i] <= rank) ++i;
 
-            bits[level].Map([](uint64_t x){return bv64_t(x);}).Print("bv");
+                    // determine block size (<= 64 at node borders)
+                    size_t block_size;
+                    if(rank+1 == blocks[i]) {
+                        block_size = m_node_sizes[first_level_node+i-1] % 64ULL;
+                    } else {
+                        block_size = 64ULL;
+                    }
+
+                    // emit bits from block
+                    bv64_t block_bits(v[0].second);
+                    for(size_t k = 0; k < block_size; k++) {
+                        emit(block_bits[63ULL-k]);
+                    }
+                })
+                .Window(thrill::api::DisjointTag, 64,
+                [](size_t, const std::vector<bool>& bv){
+
+                    // pack bools back into bit vectors
+                    bv64_t window_bits;
+                    for(size_t i = 0; i < bv.size(); i++) {
+                        window_bits[63ULL-i] = bv[i];
+                    }
+                    return uint64_t(window_bits.to_ullong());
+                })
+                .Rebalance(); // re-balance across nodes
         }
     });
-
-    // for each level l:
-    //   - for each node on level l:
-    //     - zip 64-bit blocks with indices (ZipWithIndex + node offset)
-    //   - union indexed blocks (Union) to level
-    //   - sort blocks by indices (Sort)
-    //   - process indexed blocks using a 2-block window (Window), removing
-    //     (a) the indices
-    //     (b) any leftover alignment bits
-}
-
-inline std::ostream& operator<<(
-    std::ostream& os, const std::pair<uint64_t, size_t>& x) {
-
-    bv64_t bits = x.second;
-    os << '[' << x.first << ": " << bits << ']';
-    return os;
 }
