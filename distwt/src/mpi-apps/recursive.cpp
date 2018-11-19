@@ -117,6 +117,8 @@ int main(int argc, char** argv) {
         ctx.synchronize();
     }
 
+    const double t0 = util::time();
+
     // Compute histogram
     ctx.cout_master() << "Compute histogram ..." << std::endl;
     Histogram hist(ctx, input, rdbufsize);
@@ -125,19 +127,6 @@ int main(int argc, char** argv) {
     WaveletTreeBase wt(hist);
     const size_t num_nodes = wt.num_nodes();
     bits_t nodes(num_nodes);
-
-    // FIXME: Right now, nothing is externalized, therefore we need some
-    // minimum amount of memory to process texts.
-    {
-        const size_t required_memory =
-            // bit vectors
-            (wt.height() * input.local_num()) / 8ULL +
-            // 2x local effective transformation
-            2ULL * local_num * (sizeof(esym_t) / 8ULL);
-
-        ctx.cout_master() << "required_memory: " <<
-            required_memory << " bytes" << std::endl;
-    }
 
     // Compute effective alphabet
     EffectiveAlphabet ea(hist);
@@ -388,6 +377,10 @@ int main(int argc, char** argv) {
     // Exit
     ctx.cout_master() << "Waiting for exit signals ..." << std::endl;
     ctx.synchronize();
-    ctx.cout_master() << "Finished." << std::endl;
+
+    const double dt = util::time() - t0;
+    ctx.cout_master() << "WT construction finished after "
+        << dt << " seconds." << std::endl;
+
     return 0;
 }

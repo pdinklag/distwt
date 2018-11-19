@@ -15,6 +15,8 @@
 #include <thrill/api/window.hpp>
 #include <thrill/api/write_binary.hpp>
 
+#include <thrill/common/stats_timer.hpp>
+
 #include <distwt/common/binary_io.hpp>
 #include <distwt/common/util.hpp>
 
@@ -90,6 +92,9 @@ void Process(
 
     // load raw text
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
+    rawtext.Execute(); // really DO load now and not later
+
+    thrill::common::StatsTimer timer(true);
 
     // compute histogram
     Histogram hist(rawtext);
@@ -130,6 +135,14 @@ void Process(
     } else {
         // make sure to actually compute the wavelet tree
         wt.ensure();
+    }
+
+    // stats
+    timer.Stop();
+
+    if(ctx.my_rank() == 0) {
+        LOG1 << "WT construction finished after "
+            << timer.SecondsDouble() << " seconds.";
     }
 }
 
