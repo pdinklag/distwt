@@ -1,3 +1,7 @@
+#include <bitset>
+#include <iomanip>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
@@ -89,6 +93,9 @@ int main(int argc, char** argv) {
 
     std::string local_filename("");
     cp.add_string('l', "local", local_filename, "Name of local part file.");
+
+    std::string output("");
+    cp.add_string('o', "output", output, "Name of output file.");
 
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
@@ -371,6 +378,62 @@ int main(int argc, char** argv) {
                 ctx.cout() << "level " << (level+1) << ": " << levels[level] << std::endl;
                 */
             }
+        }
+    }
+
+    // write to disk if needed
+    if(output.length() > 0) {
+        ctx.synchronize();
+        ctx.cout_master() << "Writing WT to disk ..." << std::endl;
+
+        // save histogram
+        hist.save(output + "." + WaveletTreeBase::histogram_extension());
+
+        // save WT levels
+        for(size_t level = 0; level < wt.height(); level++) {
+            // construct local filename
+            std::string filename;
+            {
+                std::ostringstream ss;
+                ss << output << std::setw(4) << std::setfill('0')
+                    << ctx.rank() << '.'
+                    << WaveletTreeBase::level_extension(level);
+                filename = ss.str();
+            }
+
+            // open file
+            MPI_File f;
+            MPI_File_open(
+                MPI_COMM_SELF,
+                filename.c_str(),
+                MPI_MODE_WRONLY | MPI_MODE_CREATE,
+                MPI_INFO_NULL,
+                &f);
+
+            // write
+            MPI_Status status;
+
+            std::bitset<64> bitbuf;
+            size_t x = 0;
+
+            const auto& bv = levels[level];
+            for(size_t i = 0; i < local_num; i++) {
+                bitbuf[63ULL - (x++)] = bv[i];
+                if(x >= 64ULL) {
+                    uint64_t ull = bitbuf.to_ullong();
+                    MPI_File_write(f, &ull, 1, MPI_LONG_LONG, &status);
+
+                    x = 0;
+                }
+            }
+
+            if(x > 0) {
+                uint64_t ull = bitbuf.to_ullong();
+                MPI_File_write(f, &ull, 1, MPI_LONG_LONG, &status);
+            }
+
+            // close file
+            MPI_File_close(&f);
         }
     }
 
