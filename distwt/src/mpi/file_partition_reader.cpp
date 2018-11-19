@@ -1,7 +1,5 @@
-#include <fstream>
-#include <iostream>
-
 #include <tlx/math/div_ceil.hpp>
+#include <mpi.h>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
@@ -26,33 +24,47 @@ bool FilePartitionReader::extract_local(
 
     if(!m_extracted) {
         m_local_filename = filename + ".part." + std::to_string(m_rank);
-        {
-            // init write buffer
-            char *buf = new char[bufsize];
-            size_t buf_pos = 0;
 
-            // extract local part
-            {
-                std::ofstream out(m_local_filename, std::ios::binary);
-                process_local([&](unsigned char c){
-                    buf[buf_pos++] = (char)c;
+        // init buffer
+        unsigned char *buf = new unsigned char[bufsize];
 
-                    // write overflowing buffer
-                    if(buf_pos >= bufsize) {
-                        out.write(buf, bufsize);
-                        buf_pos = 0;
-                    }
-                }, bufsize);
+        // open global file for read and seek
+        MPI_File fr;
+        MPI_File_open(
+            MPI_COMM_WORLD,
+            m_filename.c_str(),
+            MPI_MODE_RDONLY,
+            MPI_INFO_NULL,
+            &fr);
 
-                // write remainder
-                if(buf_pos > 0) {
-                    out.write(buf, buf_pos);
-                }
-            }
+        MPI_File_seek(fr, m_local_offset, MPI_SEEK_SET);
 
-            // clean up
-            delete[] buf;
+        // open local file for write
+        MPI_File fw;
+        MPI_File_open(
+            MPI_COMM_SELF,
+            m_local_filename.c_str(),
+            MPI_MODE_WRONLY | MPI_MODE_CREATE,
+            MPI_INFO_NULL,
+            &fw);
+
+        // copy from global file to local file
+        MPI_Status status;
+        size_t left = m_local_num;
+
+        while(left) {
+            const size_t num = std::min(bufsize, left);
+            MPI_File_read(fr, buf, num, MPI_BYTE, &status);
+            MPI_File_write(fw, buf, num, MPI_BYTE, &status);
+            left -= num;
         }
+
+        // close files
+        MPI_File_close(&fw);
+        MPI_File_close(&fr);
+
+        // clean up
+        delete[] buf;
 
         m_extracted = true;
         return true;
@@ -64,36 +76,52 @@ bool FilePartitionReader::extract_local(
 void FilePartitionReader::process_local(
     std::function<void(unsigned char)> func, size_t bufsize) const {
 
-    // initialize read buffer
-    char *buf = new char[bufsize];
-    size_t buf_count = 0, buf_pos = 0;
+    // open stream and seek position
+    MPI_File f;
 
-    {
-        // open stream and seek position
-        std::ifstream in;
+    if(m_extracted) {
+        // part was extracted - open local file
+        MPI_File_open(
+            MPI_COMM_SELF,
+            m_local_filename.c_str(),
+            MPI_MODE_RDONLY,
+            MPI_INFO_NULL,
+            &f);
+    } else {
+        // open original file and seek position
+        MPI_File_open(
+            MPI_COMM_WORLD,
+            m_filename.c_str(),
+            MPI_MODE_RDONLY,
+            MPI_INFO_NULL,
+            &f);
 
-        if(m_extracted) {
-            // part was extracted - open local file
-            in = std::ifstream(m_local_filename, std::ios::binary);
-        } else {
-            // open original file and seek position
-            in = std::ifstream(m_filename, std::ios::binary);
-            in.seekg(m_local_offset);
-        }
-
-        // process
-        for(size_t read = 0; read < m_local_num; read++) {
-            // fill underflowing buffer
-            if(buf_pos >= buf_count) {
-                buf_count = std::min(bufsize, m_local_num - read);
-                in.read(buf, buf_count);
-                buf_pos = 0;
-            }
-
-            func((unsigned char)buf[buf_pos++]);
-        }
+        MPI_File_seek(f, m_local_offset, MPI_SEEK_SET);
     }
 
-    // clean up
-    delete[] buf;
+    // process
+    {
+        // initialize read buffer
+        unsigned char *buf = new unsigned char[bufsize];
+        MPI_Status status;
+
+        size_t left = m_local_num;
+
+        while(left) {
+            const size_t num = std::min(bufsize, left);
+            MPI_File_read(f, buf, num, MPI_BYTE, &status);
+
+            for(size_t i = 0; i < num; i++) {
+                func(buf[i]);
+            }
+
+            left -= num;
+        }
+
+        // clean up
+        delete[] buf;
+    }
+
+    // close file
+    MPI_File_close(&f);
 }
