@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     // Read command-line
     tlx::CmdlineParser cp;
 
-    size_t rdbufsize = 1024ULL * 1024ULL; // default to 1Mi
+    size_t rdbufsize = 0; // default to local input size
     cp.add_bytes('r', "rbuf", rdbufsize, "File read buffer size.");
 
     std::string local_filename("");
@@ -112,6 +112,10 @@ int main(int argc, char** argv) {
     // Determine input partition
     FilePartitionReader input(ctx, input_filename);
     const size_t local_num = input.local_num();
+
+    if(rdbufsize == 0) {
+        rdbufsize = local_num;
+    }
 
     if(local_filename.length() > 0) {
         // Extract local part
