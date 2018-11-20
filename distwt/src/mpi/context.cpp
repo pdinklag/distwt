@@ -31,3 +31,10 @@ void MPIContext::synchronize() {
     MPI_Barrier(MPI_COMM_WORLD);
 }
 
+MPIContext::Traffic MPIContext::gather_traffic_data() const {
+    Traffic glob;
+    MPI_Allreduce(&m_local_traffic, &glob, 4,
+        MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+
+    return glob;
+}

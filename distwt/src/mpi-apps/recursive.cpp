@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
+#include <tlx/string/format_si_iec_units.hpp>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/context.hpp>
@@ -419,13 +420,26 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Exit
+    // Synchronize for exit
     ctx.cout_master() << "Waiting for exit signals ..." << std::endl;
     ctx.synchronize();
 
+    // Gather stats
     const double dt = util::time() - t0;
+    auto traffic = ctx.gather_traffic_data();
+
     ctx.cout_master() << "WT construction finished after "
         << dt << " seconds." << std::endl;
+
+    ctx.cout_master() << "Traffic TX: "
+        << tlx::format_iec_units(traffic.tx, 2) << "B + est. "
+        << tlx::format_iec_units(traffic.tx_est, 2) << "B."
+        << std::endl;
+
+    ctx.cout_master() << "Traffic RX: "
+        << tlx::format_iec_units(traffic.rx, 2) << "B + est. "
+        << tlx::format_iec_units(traffic.rx_est, 2) << "B."
+        << std::endl;
 
     return 0;
 }

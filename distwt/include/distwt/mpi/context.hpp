@@ -49,6 +49,8 @@ public:
         return cout(is_master());
     }
 
+    Traffic gather_traffic_data() const;
+
     template<typename T>
     void send(const T *buf, size_t num, size_t target, int tag = 0) {
         MPI_Send(buf, num, mpi_type<T>::id(), target, tag, MPI_COMM_WORLD);
