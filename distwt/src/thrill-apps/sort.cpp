@@ -22,6 +22,9 @@
 #include <distwt/thrill/effective_alphabet.hpp>
 #include <distwt/thrill/wt_levelwise.hpp>
 
+#include <thrill/common/stats_timer.hpp>
+#include <distwt/common/result.hpp>
+
 void Process(
     thrill::Context& ctx,
     std::string input,
@@ -100,10 +103,29 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
+        thrill::common::StatsTimer timer(true);
+
+        const size_t input_size = util::file_size(input_filename);
         Process(
             ctx,
             input_filename,
-            util::file_size(input_filename),
+            input_size,
             output_filename);
+
+        // gather stats
+        timer.Stop();
+
+        if(ctx.my_rank() == 0) {
+            Result result("thrill-sort",
+                ctx.num_hosts() * ctx.workers_per_host(),
+                input_filename,
+                input_size,
+                timer.SecondsDouble(),
+                ctx.net_manager().Traffic().total()
+            );
+
+            LOG1 << result.sqlplot();
+            LOG1 << result.readable();
+        }
     });
 }

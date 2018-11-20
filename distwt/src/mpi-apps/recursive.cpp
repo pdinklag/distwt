@@ -5,7 +5,6 @@
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
-#include <tlx/string/format_si_iec_units.hpp>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/context.hpp>
@@ -15,6 +14,8 @@
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/bit_vector.hpp>
+
+#include <distwt/common/result.hpp>
 
 using bits_t = std::vector<bv_t>;
 
@@ -109,6 +110,8 @@ int main(int argc, char** argv) {
     ctx.cout_master() <<
         "Starting computation with " << ctx.num_workers() << " workers ..." << std::endl;
 
+    const double t0 = util::time();
+
     // Determine input partition
     FilePartitionReader input(ctx, input_filename);
     const size_t local_num = input.local_num();
@@ -128,8 +131,6 @@ int main(int argc, char** argv) {
         ctx.cout_master() << "Synchronizing ..." << std::endl;
         ctx.synchronize();
     }
-
-    const double t0 = util::time();
 
     // Compute histogram
     ctx.cout_master() << "Compute histogram ..." << std::endl;
@@ -431,19 +432,16 @@ int main(int argc, char** argv) {
     // Gather stats
     const double dt = util::time() - t0;
     auto traffic = ctx.gather_traffic_data();
+    Result result(
+        "mpi-recursive",
+        ctx.num_workers(),
+        input.filename(),
+        input.total_size(),
+        dt,
+        traffic.total_incl_est()
+    );
 
-    ctx.cout_master() << "WT construction finished after "
-        << dt << " seconds." << std::endl;
-
-    ctx.cout_master() << "Traffic TX: "
-        << tlx::format_iec_units(traffic.tx, 2) << "B + est. "
-        << tlx::format_iec_units(traffic.tx_est, 2) << "B."
-        << std::endl;
-
-    ctx.cout_master() << "Traffic RX: "
-        << tlx::format_iec_units(traffic.rx, 2) << "B + est. "
-        << tlx::format_iec_units(traffic.rx_est, 2) << "B."
-        << std::endl;
-
+    ctx.cout_master() << result.sqlplot() << std::endl;
+    ctx.cout_master() << result.readable() << std::endl;
     return 0;
 }

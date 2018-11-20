@@ -18,6 +18,18 @@ public:
 
     struct Traffic {
         size_t tx, rx, tx_est, rx_est;
+
+        inline size_t total() const {
+            return tx + rx;
+        }
+
+        inline size_t total_est() const {
+            return tx_est + rx_est;
+        }
+
+        inline size_t total_incl_est() const {
+            return total() + total_est();
+        }
     };
 
 private:

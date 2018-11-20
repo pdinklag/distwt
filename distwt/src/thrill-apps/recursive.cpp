@@ -15,8 +15,6 @@
 #include <thrill/api/window.hpp>
 #include <thrill/api/write_binary.hpp>
 
-#include <thrill/common/stats_timer.hpp>
-
 #include <distwt/common/binary_io.hpp>
 #include <distwt/common/util.hpp>
 
@@ -26,6 +24,9 @@
 
 #include <distwt/thrill/wt_nodebased.hpp>
 #include <distwt/thrill/wt_levelwise.hpp>
+
+#include <thrill/common/stats_timer.hpp>
+#include <distwt/common/result.hpp>
 
 template<typename input_t>
 void recursiveWT(
@@ -92,9 +93,6 @@ void Process(
 
     // load raw text
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
-    rawtext.Execute(); // really DO load now and not later
-
-    thrill::common::StatsTimer timer(true);
 
     // compute histogram
     Histogram hist(rawtext);
@@ -136,14 +134,6 @@ void Process(
         // make sure to actually compute the wavelet tree
         wt.ensure();
     }
-
-    // stats
-    timer.Stop();
-
-    if(ctx.my_rank() == 0) {
-        LOG1 << "WT construction finished after "
-            << timer.SecondsDouble() << " seconds.";
-    }
 }
 
 int main(int argc, const char** argv) {
@@ -166,12 +156,31 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
+        thrill::common::StatsTimer timer(true);
+
+        const size_t input_size = util::file_size(input_filename);
         Process(
             ctx,
             input_filename,
-            util::file_size(input_filename),
+            input_size,
             output_filename,
             lower_threshold,
             upper_threshold);
+
+        // gather stats
+        timer.Stop();
+
+        if(ctx.my_rank() == 0) {
+            Result result("thrill-recursive",
+                ctx.num_hosts() * ctx.workers_per_host(),
+                input_filename,
+                input_size,
+                timer.SecondsDouble(),
+                ctx.net_manager().Traffic().total()
+            );
+
+            LOG1 << result.sqlplot();
+            LOG1 << result.readable();
+        }
     });
 }
