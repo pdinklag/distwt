@@ -197,13 +197,12 @@ int main(int argc, char** argv) {
 
             // send sizes to workers with higher rank
             for(size_t to = ctx.rank() + 1; to < ctx.num_workers(); to++) {
-                MPI_Send(sz.data(), sz.size(), MPI_LONG_LONG, (int)to, 0, MPI_COMM_WORLD);
+                ctx.send(sz, to);
             }
 
             // receive sizes from workers with lower rank
-            MPI_Status status;
             for(size_t from = 0; from < ctx.rank(); from++) {
-                MPI_Recv(sz.data(), num_nodes, MPI_LONG_LONG, (int)from, 0, MPI_COMM_WORLD, &status);
+                ctx.recv(sz, num_nodes, from);
 
                 // compute prefix sum
                 for(size_t i = 0; i < num_nodes; i++) {
@@ -264,16 +263,12 @@ int main(int argc, char** argv) {
                                 encode_bv_interval_msg(
                                     msg_self[i], bv, local_p, local_q, p, q);
                             } else {
-                                MPI_Request req;
-
                                 auto& msg = msg_outbox[msg_out_num++];
 
                                 encode_bv_interval_msg(
                                     msg, bv, local_p, local_q, p, q);
 
-                                MPI_Isend(msg.data, msg.size, MPI_LONG_LONG,
-                                    (int)target, (int)level, MPI_COMM_WORLD,
-                                    &req);
+                                ctx.isend(msg.data, msg.size, target, level);
                             }
                         };
 
@@ -350,25 +345,12 @@ int main(int argc, char** argv) {
                 // now receive messages from other nodes until
                 // local_num bits have been received
                 while(bits_received < local_num) {
-                    MPI_Status status;
-                    MPI_Probe(
-                        MPI_ANY_SOURCE,
-                        (int)level,
-                        MPI_COMM_WORLD,
-                        &status);
+                    auto r = ctx.template probe<uint64_t>((int)level);
 
-                    int size;
-                    MPI_Get_count(&status, MPI_LONG_LONG, &size);
-
-                    if(size > 0) {
-                        bv_interval_msg_t msg(size);
-                        MPI_Recv(msg.data, msg.size, MPI_LONG_LONG,
-                            status.MPI_SOURCE,
-                            (int)level,
-                            MPI_COMM_WORLD,
-                            &status);
-
-                        recv(msg, status.MPI_SOURCE);
+                    if(r.size > 0) {
+                        bv_interval_msg_t msg(r.size);
+                        ctx.recv(msg.data, msg.size, r.sender, level);
+                        recv(msg, r.sender);
                     }
                 }
 

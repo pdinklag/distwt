@@ -7,7 +7,7 @@
 constexpr size_t SIGMA_MAX = 256ULL;
 
 Histogram::Histogram(
-    const MPIContext& ctx,
+    MPIContext& ctx,
     const FilePartitionReader& input,
     const size_t rdbufsize) {
 
@@ -19,8 +19,7 @@ Histogram::Histogram(
 
     // distribute
     size_t hist[SIGMA_MAX] = {0};
-    MPI_Allreduce(local_hist, hist, SIGMA_MAX,
-        MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+    ctx.all_reduce(local_hist, hist, SIGMA_MAX);
 
     // extract nonzero entries
     for(size_t c = 0; c < SIGMA_MAX; c++) {

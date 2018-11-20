@@ -9,7 +9,7 @@ public:
     using HistogramBase::HistogramBase;
 
     Histogram(
-        const MPIContext& ctx,
+        MPIContext& ctx,
         const FilePartitionReader& input,
         const size_t rdbufsize);
 

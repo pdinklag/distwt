@@ -4,7 +4,8 @@
 
 util::devnull MPIContext::m_devnull;
 
-MPIContext::MPIContext(int* argc, char*** argv) {
+MPIContext::MPIContext(int* argc, char*** argv)
+    : m_local_traffic({0,0,0,0}) {
     MPI_Init(argc, argv);
     MPI_Comm_size(MPI_COMM_WORLD, &m_num_workers);
     MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
@@ -29,3 +30,4 @@ std::ostream& MPIContext::cout(bool b) const {
 void MPIContext::synchronize() {
     MPI_Barrier(MPI_COMM_WORLD);
 }
+
