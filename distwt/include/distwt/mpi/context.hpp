@@ -17,7 +17,8 @@ public:
     };
 
     struct Traffic {
-        size_t tx, rx, tx_est, rx_est;
+        static constexpr size_t num_fields = 6;
+        size_t tx, rx, tx_est, rx_est, tx_shm, rx_shm;
 
         inline size_t total() const {
             return tx + rx;
@@ -27,23 +28,39 @@ public:
             return tx_est + rx_est;
         }
 
+        inline size_t total_shm() const {
+            return tx_shm + rx_shm;
+        }
+
         inline size_t total_incl_est() const {
             return total() + total_est();
         }
     };
 
 private:
-    static constexpr int SYNC_RDY_TAG = 777;
-    static constexpr int SYNC_ACK_TAG   = 778;
-
-    static constexpr int EXIT_TAG = 666;
-
     static util::devnull m_devnull;
 
-    int m_num_workers, m_rank;
+    size_t m_num_workers, m_rank;
+    size_t m_workers_per_node;
     double m_start_time;
 
     Traffic m_local_traffic;
+
+    inline void count_traffic_tx(size_t target, size_t bytes) {
+        if(same_node_as(target)) {
+            m_local_traffic.tx_shm += bytes;
+        } else {
+            m_local_traffic.tx += bytes;
+        }
+    }
+
+    inline void count_traffic_rx(size_t source, size_t bytes) {
+        if(same_node_as(source)) {
+            m_local_traffic.rx_shm += bytes;
+        } else {
+            m_local_traffic.rx += bytes;
+        }
+    }
 
 public:
     MPIContext(int* argc, char*** argv);
@@ -51,6 +68,18 @@ public:
 
     inline size_t num_workers() const { return (size_t)m_num_workers; }
     inline size_t rank() const { return (size_t)m_rank; }
+
+    inline size_t node_rank(size_t worker) {
+        return worker / m_workers_per_node;
+    }
+
+    inline size_t node_rank() {
+        node_rank(m_rank);
+    }
+
+    inline bool same_node_as(size_t other) {
+        return node_rank() == node_rank(other);
+    }
 
     inline bool is_master() const { return m_rank == 0; }
 
@@ -66,7 +95,7 @@ public:
     template<typename T>
     void send(const T *buf, size_t num, size_t target, int tag = 0) {
         MPI_Send(buf, num, mpi_type<T>::id(), target, tag, MPI_COMM_WORLD);
-        m_local_traffic.tx += num * sizeof(T);
+        count_traffic_tx(target, num * sizeof(T));
     }
 
     template<typename T>
@@ -78,7 +107,7 @@ public:
     MPI_Status recv(T* buf, size_t num, size_t source, int tag = 0) {
         MPI_Status st;
         MPI_Recv(buf, num, mpi_type<T>::id(), source, tag, MPI_COMM_WORLD, &st);
-        m_local_traffic.rx += num * sizeof(T);
+        count_traffic_rx(source, num * sizeof(T));
         return st;
     }
 
@@ -93,7 +122,7 @@ public:
     MPI_Request isend(const T *buf, size_t num, size_t target, int tag = 0) {
         MPI_Request req;
         MPI_Isend(buf, num, mpi_type<T>::id(), target, tag, MPI_COMM_WORLD, &req);
-        m_local_traffic.tx += num * sizeof(T);
+        count_traffic_tx(target, num * sizeof(T));
         return req;
     }
 
@@ -115,6 +144,7 @@ public:
 
     template<typename T>
     inline void all_reduce(const T* sbuf, T* rbuf, size_t num, MPI_Op op = MPI_SUM) {
+        // allreduce
         MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, MPI_COMM_WORLD);
 
         // estimate TX/RX
@@ -126,9 +156,18 @@ public:
         }
 
         const size_t msg_size = sizeof(int) + sizeof(T); // index and value
-        const size_t traffic =
-            (num - my_num) * msg_size // send own data to responsible
-            + my_num * (num_workers() - 1) * msg_size; // broadcast data I'm responsible for
+
+        // traffic for reporting own data
+        // FIXME: this is pessimistic, as it includes shared memory traffic
+        const size_t traffic_report = (num - my_num) * msg_size;
+
+        // traffic for broadcasting locally reduced data
+        const size_t traffic_bcast = (m_workers_per_node <= num_workers())
+            ? 0ULL
+            : my_num * (num_workers() - m_workers_per_node - 1) * msg_size;
+
+        // total traffic
+        const size_t traffic = traffic_report + traffic_bcast;
 
         m_local_traffic.tx_est += traffic;
         m_local_traffic.rx_est += traffic;
