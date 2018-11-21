@@ -430,7 +430,7 @@ int main(int argc, char** argv) {
     const double dt = util::time() - t0;
     auto traffic = ctx.gather_traffic_data();
     Result result(
-        "mpi-recursive",
+        "mpi-dd",
         ctx.num_nodes(),
         ctx.num_workers_per_node(),
         input.filename(),

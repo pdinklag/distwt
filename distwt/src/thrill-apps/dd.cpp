@@ -171,7 +171,7 @@ int main(int argc, const char** argv) {
         timer.Stop();
 
         if(ctx.my_rank() == 0) {
-            Result result("thrill-recursive",
+            Result result("thrill-dd",
                 ctx.num_hosts(),
                 ctx.workers_per_host(),
                 input_filename,
