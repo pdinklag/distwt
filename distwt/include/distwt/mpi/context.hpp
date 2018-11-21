@@ -66,8 +66,16 @@ public:
     MPIContext(int* argc, char*** argv);
     ~MPIContext();
 
-    inline size_t num_workers() const { return (size_t)m_num_workers; }
-    inline size_t rank() const { return (size_t)m_rank; }
+    inline size_t num_workers() const { return m_num_workers; }
+    inline size_t rank() const { return m_rank; }
+
+    inline size_t num_nodes() const {
+        return m_num_workers / m_workers_per_node;
+    }
+
+    inline size_t num_workers_per_node() const {
+        return m_workers_per_node;
+    }
 
     inline size_t node_rank(size_t worker) {
         return worker / m_workers_per_node;

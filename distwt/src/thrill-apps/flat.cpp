@@ -130,7 +130,8 @@ int main(int argc, const char** argv) {
 
         if(ctx.my_rank() == 0) {
             Result result("thrill-flat",
-                ctx.num_hosts() * ctx.workers_per_host(),
+                ctx.num_hosts(),
+                ctx.workers_per_host(),
                 input_filename,
                 input_size,
                 timer.SecondsDouble(),

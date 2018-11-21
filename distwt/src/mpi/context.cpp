@@ -27,10 +27,16 @@ MPIContext::MPIContext(int* argc, char*** argv)
         MPI_Comm_size(shmcomm, &shmsize);
 
         m_workers_per_node = (size_t)shmsize;
-        cout() << "m_workers_per_node = " << m_workers_per_node << std::endl;
     }
 
+    // initial synchronization
+    MPI_Barrier(MPI_COMM_WORLD);
     m_start_time = util::time();
+
+    cout_master() << "MPIContext initialized with "
+        << num_workers() << " workers on "
+        << num_nodes() << " nodes ..."
+        << std::endl;
 }
 
 MPIContext::~MPIContext() {

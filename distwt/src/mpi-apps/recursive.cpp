@@ -107,9 +107,6 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
-    ctx.cout_master() <<
-        "Starting computation with " << ctx.num_workers() << " workers ..." << std::endl;
-
     const double t0 = util::time();
 
     // Determine input partition
@@ -434,7 +431,8 @@ int main(int argc, char** argv) {
     auto traffic = ctx.gather_traffic_data();
     Result result(
         "mpi-recursive",
-        ctx.num_workers(),
+        ctx.num_nodes(),
+        ctx.num_workers_per_node(),
         input.filename(),
         input.total_size(),
         dt,
