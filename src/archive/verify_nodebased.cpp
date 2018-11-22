@@ -1,3 +1,9 @@
+/*
+    This is no longer really needed, because all apps constructing the
+    nodebased wavelet tree have been extended by a merge step to compute
+    the levelwise wavelet tree instead.
+*/
+
 #include "verify_template.hpp"
 #include <distwt/thrill/wt_nodebased.hpp>
 

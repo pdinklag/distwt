@@ -14,6 +14,3 @@ target_link_libraries(thrill-flat-dd ${THRILL_APP_DEPENDENCIES})
 add_executable(verify-levelwise verify_levelwise.cpp)
 target_link_libraries(verify-levelwise ${THRILL_APP_DEPENDENCIES})
 
-# Node based verifier
-#add_executable(verify-nodebased verify_nodebased.cpp)
-#target_link_libraries(verify-nodebased ${THRILL_APP_DEPENDENCIES})
