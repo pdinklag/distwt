@@ -32,14 +32,12 @@ template<typename input_t>
 void recursiveWT(
     WaveletTree::bits_t& bits,
     const WaveletTreeBase& wt,
-    const float lower_threshold,
-    const float upper_threshold,
-    const size_t original_input_size,
     const size_t node_id,
     input_t input,
     const size_t a,
     const size_t b) {
 
+    if(a == b) return;
     const size_t m = (a + b) / 2;
 
     // compute node BV
@@ -55,41 +53,20 @@ void recursiveWT(
         })
         .Cache();
 
-    // "parallel split"
-    auto balanced_recurse = [&](auto s, size_t id, size_t x, size_t y) {
-        if(x < y) {
-            const size_t child_sz = wt.node_sizes()[id-1];
-            const float p = float(child_sz) / float(original_input_size);
-            if(lower_threshold < p && p < upper_threshold) {
-                LOG1 << "p = " << p << " for node " << id << " - rebalancing";
-                recursiveWT(bits, wt,
-                    lower_threshold, upper_threshold, original_input_size,
-                    id, s.Rebalance().Cache(), x, y);
-            } else {
-                recursiveWT(bits, wt,
-                    lower_threshold, upper_threshold, original_input_size,
-                    id, s.Cache(), x, y);
-            }
-        }
-    };
+    // left child
+    auto input_l = input.Filter([m](const esym_t& c){ return (c <= m); });
+    recursiveWT(bits, wt, 2ULL * node_id, input_l.Cache(), a, m);
 
-    balanced_recurse(
-        input.Filter([m](const esym_t& c){ return (c <= m); }),
-        2ULL * node_id, a, m);
-
-    balanced_recurse(
-        input.Filter([m](const esym_t& c){ return (c > m); }),
-        2ULL * node_id + 1ULL, m+1, b);
-
+    // right child
+    auto input_r = input.Filter([m](const esym_t& c){ return (c >  m); });
+    recursiveWT(bits, wt, 2ULL * node_id + 1ULL, input_r.Cache(), m+1, b);
 }
 
 void Process(
     thrill::Context& ctx,
     const std::string& input,
     const size_t input_size,
-    const std::string& output,
-    const float lower_threshold,
-    const float upper_threshold) {
+    const std::string& output) {
 
     // load raw text
     auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
@@ -112,9 +89,6 @@ void Process(
         recursiveWT(
             bits,
             wt,
-            lower_threshold,
-            upper_threshold,
-            input_size,
             1ULL,             // start with root node
             etext,            // start with full transformed text
             0, num_nodes);
@@ -142,13 +116,9 @@ int main(int argc, const char** argv) {
 
     std::string input_filename; // required
     std::string output_filename = "";
-    float upper_threshold = 0.0f;
-    float lower_threshold = 1.0f;
 
     cp.add_param_string("file", input_filename, "The input file.");
     cp.add_string('o', "out", output_filename, "The base output filename.");
-    cp.add_float('l', "lower", lower_threshold, "Lower threshold for re-balancing.");
-    cp.add_float('u', "upper", upper_threshold, "Upper threshold for re-balancing.");
 
     if (!cp.process(argc, argv)) {
         return -1;
@@ -163,9 +133,7 @@ int main(int argc, const char** argv) {
             ctx,
             input_filename,
             input_size,
-            output_filename,
-            lower_threshold,
-            upper_threshold);
+            output_filename);
 
         // gather stats
         timer.Stop();
