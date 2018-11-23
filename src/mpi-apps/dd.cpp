@@ -15,7 +15,7 @@
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/bit_vector.hpp>
 
-#include <distwt/common/result.hpp>
+#include <distwt/mpi/result.hpp>
 
 using bits_t = std::vector<bv_t>;
 
@@ -426,18 +426,9 @@ int main(int argc, char** argv) {
     ctx.cout_master() << "Waiting for exit signals ..." << std::endl;
     ctx.synchronize();
 
-    // Gather stats
+    // gather stats
     const double dt = util::time() - t0;
-    auto traffic = ctx.gather_traffic_data();
-    Result result(
-        "mpi-dd",
-        ctx.num_nodes(),
-        ctx.num_workers_per_node(),
-        input.filename(),
-        input.total_size(),
-        dt,
-        traffic.total_incl_est()
-    );
+    Result result("mpi-dd", ctx, input, dt);
 
     ctx.cout_master() << result.sqlplot() << std::endl;
     ctx.cout_master() << result.readable() << std::endl;

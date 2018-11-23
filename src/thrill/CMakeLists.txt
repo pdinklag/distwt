@@ -2,6 +2,7 @@ add_library(distwt-thrill
 
     effective_alphabet.cpp
     histogram.cpp
+    result.cpp
     wt_levelwise.cpp
     wt_nodebased.cpp
 )

@@ -25,7 +25,7 @@
 #include <distwt/thrill/wt_levelwise.hpp>
 
 #include <thrill/common/stats_timer.hpp>
-#include <distwt/common/result.hpp>
+#include <distwt/thrill/result.hpp>
 
 template<typename input_t>
 void flatWT(
@@ -127,17 +127,8 @@ int main(int argc, const char** argv) {
 
         // gather stats
         timer.Stop();
-
+        Result result("thrill-flat-dd", ctx, input_filename, input_size, timer.SecondsDouble());
         if(ctx.my_rank() == 0) {
-            Result result("thrill-flat-dd",
-                ctx.num_hosts(),
-                ctx.workers_per_host(),
-                input_filename,
-                input_size,
-                timer.SecondsDouble(),
-                ctx.net_manager().Traffic().total()
-            );
-
             LOG1 << result.sqlplot();
             LOG1 << result.readable();
         }

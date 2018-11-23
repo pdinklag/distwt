@@ -19,22 +19,6 @@ public:
     struct Traffic {
         static constexpr size_t num_fields = 6;
         size_t tx, rx, tx_est, rx_est, tx_shm, rx_shm;
-
-        inline size_t total() const {
-            return tx + rx;
-        }
-
-        inline size_t total_est() const {
-            return tx_est + rx_est;
-        }
-
-        inline size_t total_shm() const {
-            return tx_shm + rx_shm;
-        }
-
-        inline size_t total_incl_est() const {
-            return total() + total_est();
-        }
     };
 
 private:
