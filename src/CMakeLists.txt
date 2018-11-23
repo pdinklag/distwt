@@ -1,3 +1,6 @@
+# Tools
+add_subdirectory(tools)
+
 # distwt-common
 set(COMMON_DEPENDENCIES ${TLX_LIBRARIES})
 add_subdirectory(common)
