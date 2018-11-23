@@ -113,7 +113,7 @@ void MPIContext::synchronize() {
 size_t MPIContext::gather_max_alloc() const {
     size_t glob;
     MPI_Allreduce(&m_alloc_max, &glob, 1,
-        MPI_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
+        MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
 
     return glob;
 }
