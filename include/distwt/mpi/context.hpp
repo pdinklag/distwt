@@ -10,6 +10,15 @@
 #include <distwt/mpi/mpi_type.hpp>
 
 class MPIContext {
+private:
+    static util::devnull m_devnull;
+    static MPIContext* m_current;
+
+public:
+    static inline MPIContext* current() { return m_current; }
+    static void on_alloc(size_t size);
+    static void on_free(size_t size);
+
 public:
     struct ProbeResult {
         size_t size;
@@ -22,29 +31,18 @@ public:
     };
 
 private:
-    static util::devnull m_devnull;
-
     size_t m_num_workers, m_rank;
     size_t m_workers_per_node;
     double m_start_time;
 
     Traffic m_local_traffic;
+    size_t m_alloc_current, m_alloc_max;
 
-    inline void count_traffic_tx(size_t target, size_t bytes) {
-        if(same_node_as(target)) {
-            m_local_traffic.tx_shm += bytes;
-        } else {
-            m_local_traffic.tx += bytes;
-        }
-    }
+    void count_traffic_tx(size_t target, size_t bytes);
+    void count_traffic_rx(size_t source, size_t bytes);
 
-    inline void count_traffic_rx(size_t source, size_t bytes) {
-        if(same_node_as(source)) {
-            m_local_traffic.rx_shm += bytes;
-        } else {
-            m_local_traffic.rx += bytes;
-        }
-    }
+    void track_alloc(size_t size);
+    void track_free(size_t size);
 
 public:
     MPIContext(int* argc, char*** argv);
@@ -82,7 +80,11 @@ public:
         return cout(is_master());
     }
 
-    Traffic gather_traffic_data() const;
+    inline size_t local_alloc_current() const { return m_alloc_current; }
+    inline size_t local_alloc_max() const { return m_alloc_max; }
+
+    Traffic gather_traffic() const;
+    size_t gather_max_alloc() const;
 
     template<typename T>
     void send(const T *buf, size_t num, size_t target, int tag = 0) {

@@ -60,6 +60,7 @@ Result::Result(
     stats = ctx.net.Reduce(stats);
 
     // read from Thrill stats
+    m_memory = stats.max_block_bytes;
     m_traffic = stats.net_traffic_tx;
     m_traffic_asym = tlx::abs_diff(stats.net_traffic_tx, stats.net_traffic_rx);
 }

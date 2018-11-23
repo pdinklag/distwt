@@ -5,6 +5,7 @@ add_library(distwt-mpi
     effective_alphabet.cpp
     file_partition_reader.cpp
     histogram.cpp
+    malloc.cpp
     result.cpp
 )
 target_link_libraries(distwt-mpi ${MPI_DEPENDENCIES})

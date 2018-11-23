@@ -15,8 +15,10 @@ Result::Result(
     m_size = input.total_size();
     m_time = time;
 
-    // compute traffic data
-    auto traffic = ctx.gather_traffic_data();
+    // gather distributed stats
+    m_memory = ctx.gather_max_alloc();
+
+    auto traffic = ctx.gather_traffic();
     m_traffic = traffic.tx + traffic.tx_est;
     m_traffic_asym = tlx::abs_diff(
         traffic.tx + traffic.tx_est,

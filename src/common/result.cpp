@@ -12,6 +12,7 @@ std::string ResultBase::sqlplot() const {
     oss << " input=" << m_input;
     oss << " size=" << m_size;
     oss << " time=" << m_time;
+    oss << " memory=" << m_memory;
     oss << " traffic=" << m_traffic;
     oss << " traffic_asym=" << m_traffic_asym;
     return oss.str();
@@ -24,6 +25,8 @@ std::string ResultBase::readable() const {
         << m_time << " seconds using " << m_nodes << " nodes ("
         << m_workers_per_node << " workers each) causing "
         << tlx::format_iec_units(m_traffic, 3) << "B of net traffic"
-        << " (" << tlx::format_iec_units(m_traffic_asym, 3) << "B assymetry).";
+        << " (" << tlx::format_iec_units(m_traffic_asym, 3) << "B assymetry) "
+        << "using at most " << tlx::format_iec_units(m_memory, 3)
+        << "B of RAM.";
     return oss.str();
 }
