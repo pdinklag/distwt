@@ -179,7 +179,10 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     // determine block size (<= 64 at node borders)
                     size_t block_size;
                     if(rank+1 == blocks[i]) {
-                        block_size = m_node_sizes[first_level_node+i-1] % 64ULL;
+                        const size_t sz_mod64 =
+                            m_node_sizes[first_level_node+i-1] % 64ULL;
+
+                        block_size = (sz_mod64 == 0ULL) ? 64ULL : sz_mod64;
                     } else {
                         block_size = 64ULL;
                     }
