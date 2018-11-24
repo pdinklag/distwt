@@ -47,10 +47,9 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                 const size_t num_level_nodes = 1ULL << level;
                 const size_t first_level_node = num_level_nodes;
 
-                // messages to self
-                // buffer needs to be of fixed size to avoid destructor calls
-                std::vector<bv_interval_msg_t> msg_self(num_level_nodes);
-
+                // outbox buffer
+                // needs to be of fixed size to avoid destructor calls
+                // FIXME: better design?
                 std::vector<bv_interval_msg_t> msg_outbox(2ULL * num_level_nodes);
                 size_t msg_out_num = 0;
 
@@ -80,18 +79,12 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                                 << " to #" << target << std::endl;
                             */
 
-                            if(target == ctx.rank()) {
-                                // send to self
-                                encode_bv_interval_msg(
-                                    msg_self[i], bv, local_p, local_q, p, q);
-                            } else {
-                                auto& msg = msg_outbox[msg_out_num++];
+                            auto& msg = msg_outbox[msg_out_num++];
 
-                                encode_bv_interval_msg(
-                                    msg, bv, local_p, local_q, p, q);
+                            encode_bv_interval_msg(
+                                msg, bv, local_p, local_q, p, q);
 
-                                ctx.isend(msg.data, msg.size, target, level);
-                            }
+                            ctx.isend(msg.data, msg.size, target, level);
                         };
 
                         // find range of the local node's bit vector
@@ -159,15 +152,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     */
                 };
 
-                // receive messages sent to self first
-                {
-                    for(auto& msg : msg_self) {
-                        if(msg) recv(msg, ctx.rank());
-                    }
-                }
-
-                // now receive messages from other nodes until
-                // local_num bits have been received
+                // receive messages until local_num bits have been received
                 while(bits_received < input.local_num()) {
                     auto r = ctx.template probe<uint64_t>((int)level);
 
@@ -178,11 +163,9 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     }
                 }
 
-                // DEBUG
+                // this synchronization is necessary in order to maintain the
+                // outbox buffer until all messages have been received
                 ctx.synchronize();
-                /*
-                ctx.cout() << "level " << (level+1) << ": " << levels[level] << std::endl;
-                */
             }
         }
 
