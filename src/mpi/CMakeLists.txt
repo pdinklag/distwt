@@ -7,5 +7,7 @@ add_library(distwt-mpi
     histogram.cpp
     malloc.cpp
     result.cpp
+    wt_levelwise.cpp
+    wt_nodebased.cpp
 )
 target_link_libraries(distwt-mpi ${MPI_DEPENDENCIES})
