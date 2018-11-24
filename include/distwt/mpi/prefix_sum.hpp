@@ -17,6 +17,12 @@ void prefix_sum(
 
     const size_t num = v.size();
 
+    // TODO a possible optimization to reduce network traffic:
+    // - instead of sending data to every worker, only send it to the first
+    //   relevant worker of each node
+    // - in a second step, that worker will pass on the information to the
+    //   remaining workers on the same node, but in shared memory
+
     // send data to workers with a higher rank
     for(size_t to = ctx.rank() + 1; to < ctx.num_workers(); to++) {
         ctx.send(v, to);
