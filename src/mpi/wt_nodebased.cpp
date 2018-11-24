@@ -15,6 +15,11 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
         bits.resize(height());
         bits[0] = m_bits[0]; // simply copy root
 
+        if(discard) {
+            m_bits[0].clear();
+            m_bits[0].shrink_to_fit();
+        }
+
         // Part 1 - Distribute local offsets for all nodes
         ctx.cout_master() << "Distributing node prefix sums ..." << std::endl;
 
