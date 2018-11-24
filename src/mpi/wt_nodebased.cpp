@@ -1,6 +1,8 @@
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
 
+#include <distwt/mpi/prefix_sum.hpp>
+
 WaveletTreeLevelwise WaveletTreeNodebased::merge(
     MPIContext& ctx,
     const FilePartitionReader& input,
@@ -19,26 +21,11 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
         const size_t num_nodes = wt.num_nodes();
         std::vector<size_t> local_node_offs(num_nodes);
         {
-            // compute local node sizes
-            std::vector<size_t> sz(num_nodes);
+            // compute prefix sum of local node sizes
             for(size_t i = 0; i < num_nodes; i++) {
-                sz[i] = m_bits[i].size();
+                local_node_offs[i] = m_bits[i].size();
             }
-
-            // send sizes to workers with higher rank
-            for(size_t to = ctx.rank() + 1; to < ctx.num_workers(); to++) {
-                ctx.send(sz, to);
-            }
-
-            // receive sizes from workers with lower rank
-            for(size_t from = 0; from < ctx.rank(); from++) {
-                ctx.recv(sz, num_nodes, from);
-
-                // compute prefix sum
-                for(size_t i = 0; i < num_nodes; i++) {
-                    local_node_offs[i] += sz[i];
-                }
-            }
+            prefix_sum(ctx, local_node_offs);
         }
 
         // Part 2 - Distribute bits in a balanced manner
