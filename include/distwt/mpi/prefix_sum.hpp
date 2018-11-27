@@ -4,7 +4,6 @@
 #include <vector>
 
 #include <distwt/mpi/context.hpp>
-#include <distwt/mpi/mpi_type.hpp>
 
 // computes the prefix sum of vector v
 // after the operation, on the j-th worker, v contains the sum of the vectors

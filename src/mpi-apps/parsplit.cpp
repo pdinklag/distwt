@@ -1,8 +1,7 @@
-#include <bitset>
-#include <string>
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
+#include <tlx/math/integer_log2.hpp>
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/context.hpp>
@@ -11,7 +10,7 @@
 #include <distwt/common/wt.hpp>
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
-#include <distwt/mpi/bit_vector.hpp>
+#include <distwt/mpi/parallel_split.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
 
@@ -19,19 +18,23 @@
 
 void recursiveWT(
     WaveletTree::bits_t& bits,
-    const MPIContext& ctx,
+    MPIContext& ctx,
     const size_t node_id,
-    esym_t* text,
-    const size_t n,
+    std::vector<esym_t>& text,
     const size_t a,
     const size_t b,
-    esym_t* buffer) {
+    const size_t m_min,
+    const size_t m_max) {
 
     if(a == b) return;
 
     const size_t m = (a + b) / 2;
 
     // compute node bit vector
+    ctx.cout_master() << "Processing node " << node_id << " using "
+        << (m_max - m_min + 1) << " worker(s) ..." << std::endl;
+
+    const size_t n = text.size();
     size_t z = 0;
     {
         auto& bv = bits[node_id-1];
@@ -47,40 +50,78 @@ void recursiveWT(
         }
     }
 
-    // only continue if needed
     if(a < m || m+1 < b) {
-        // compute permutation of text in buffer
-        {
-            esym_t* pl = buffer;
-            esym_t* pr = buffer + z;
+        // perform parallel split
+        const size_t split = parallel_str_split(
+            ctx,
+            text,
+            [m](const esym_t& x){return (x > m);},
+            z, n-z,
+            m_min, m_max,
+            (int)node_id);
 
-            for(size_t i = 0; i < n; i++) {
-                auto c = text[i];
-                if(c <= m) {
-                    *pl++ = c;
-                } else {
-                    *pr++ = c;
-                }
+        // create communicators for left and right groups
+        MPI_Comm parent_comm = ctx.comm();
+        MPI_Group target_group_l, target_group_r;
+        MPI_Comm target_comm_l, target_comm_r;
+        {
+            MPI_Group parent_group;
+            MPI_Comm_group(parent_comm, &parent_group);
+
+            const size_t num_l = split - m_min;
+            int ranks_l[num_l];
+            for(size_t i = 0; i < num_l; i++) {
+                ranks_l[i] = int(m_min + i);
             }
+
+            // left
+            MPI_Group_incl(parent_group, num_l, ranks_l, &target_group_l);
+            MPI_Comm_create(parent_comm, target_group_l, &target_comm_l);
+
+            // right
+            MPI_Group_excl(parent_group, num_l, ranks_l, &target_group_r);
+            MPI_Comm_create(parent_comm, target_group_r, &target_comm_r);
         }
 
-        // recurse on left part
-        recursiveWT(
-            bits,
-            ctx,
-            2ULL * node_id, // left child
-            buffer, z,
-            a, m,
-            text);
+        // recurse in respective group
+        if(text.size() > 0) {
+            if(ctx.rank() < split) {
+                // recurse with left child in left group
+                ctx.set_comm(target_comm_l);
+                recursiveWT(
+                    bits,
+                    ctx,
+                    2ULL * node_id,
+                    text,
+                    a, m,
+                    0, ctx.num_workers()-1);
+            } else {
+                // recurse with right child in right group
+                ctx.set_comm(target_comm_r);
+                recursiveWT(
+                    bits,
+                    ctx,
+                    2ULL * node_id + 1,
+                    text,
+                    m+1, b,
+                    0, ctx.num_workers()-1);
+            }
 
-        // recurse on right part
-        recursiveWT(
-            bits,
-            ctx,
-            2ULL * node_id + 1ULL, // right child
-            buffer + z, n - z,
-            m+1, b,
-            text + z);
+            // restore communicator
+            ctx.set_comm(parent_comm);
+        } else {
+            ctx.cout() << "idling after computation of node " << node_id
+                << " ..." << std::endl;
+        }
+
+        // synchronize
+        ctx.synchronize();
+
+        // free temporary communicators
+        if(target_comm_l != MPI_COMM_NULL) MPI_Comm_free(&target_comm_l);
+        if(target_comm_r != MPI_COMM_NULL) MPI_Comm_free(&target_comm_r);
+        MPI_Group_free(&target_group_l);
+        MPI_Group_free(&target_group_r);
     }
 }
 
@@ -105,7 +146,7 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
-    const double t0 = MPI_Wtime();
+    const double t0 = ctx.time();
 
     // Determine input partition
     FilePartitionReader input(ctx, input_filename);
@@ -131,12 +172,27 @@ int main(int argc, char** argv) {
     ctx.cout_master() << "Compute histogram ..." << std::endl;
     Histogram hist(ctx, input, rdbufsize);
 
+    // check if enough workers are available
+    {
+        const size_t sigma = hist.size();
+        const size_t wt_height = tlx::integer_log2_ceil(sigma - 1);
+        const size_t min_workers = 1ULL << wt_height;
+
+        if(ctx.num_workers() < min_workers) {
+            ctx.cout_master() << "Not enough workers available! (sigma = "
+                << sigma << " -> " << min_workers << " workers required)"
+                << std::endl;
+
+            return 1;
+        }
+    }
+
     // Compute effective alphabet
     EffectiveAlphabet ea(hist);
 
     // Transform text and cache in RAM
     ctx.cout_master() << "Compute effective transformation ..." << std::endl;
-    esym_t* etext = new esym_t[local_num];
+    std::vector<esym_t> etext(local_num);
     {
         size_t i = 0;
         ea.transform(input, [&](esym_t x){ etext[i++] = x; }, rdbufsize);
@@ -149,20 +205,18 @@ int main(int argc, char** argv) {
 
         bits.resize(wt.num_nodes());
 
-        esym_t* buffer = new esym_t[local_num];
         recursiveWT(
             bits,
             ctx,
             1ULL, // root
-            etext, local_num, // text
-            0ULL, wt.num_nodes(), // interval
-            buffer); // work buffer
-
-        delete[] buffer;
+            etext, // text
+            0ULL, wt.num_nodes(), // alphabet interval
+            0ULL, ctx.num_workers()-1); // worker interval
     });
 
     // Clean up
-    delete[] etext;
+    etext.clear();
+    etext.shrink_to_fit();
 
     // Synchronize
     ctx.cout_master() << "Done computing " << wt_nodes.num_nodes()
@@ -186,8 +240,8 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    const double dt = MPI_Wtime();
-    Result result("mpi-dd", ctx, input, dt);
+    const double dt = ctx.time() - t0;
+    Result result("mpi-parsplit", ctx, input, dt);
 
     ctx.cout_master() << result.sqlplot() << std::endl;
     ctx.cout_master() << result.readable() << std::endl;

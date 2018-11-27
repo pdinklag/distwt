@@ -21,6 +21,7 @@ public:
 
 public:
     struct ProbeResult {
+        bool   avail;
         size_t size;
         size_t sender;
     };
@@ -31,6 +32,8 @@ public:
     };
 
 private:
+    MPI_Comm m_comm;
+
     size_t m_num_workers, m_rank;
     size_t m_workers_per_node;
     double m_start_time;
@@ -47,6 +50,8 @@ private:
 public:
     MPIContext(int* argc, char*** argv);
     ~MPIContext();
+
+    inline double time() const { return MPI_Wtime() - m_start_time; }
 
     inline size_t num_workers() const { return m_num_workers; }
     inline size_t rank() const { return m_rank; }
@@ -73,6 +78,9 @@ public:
 
     inline bool is_master() const { return m_rank == 0; }
 
+    inline MPI_Comm comm() const { return m_comm; }
+    void set_comm(MPI_Comm comm);
+
     std::ostream& cout() const;
     std::ostream& cout(bool b) const;
 
@@ -88,7 +96,7 @@ public:
 
     template<typename T>
     void send(const T *buf, size_t num, size_t target, int tag = 0) {
-        MPI_Send(buf, num, mpi_type<T>::id(), target, tag, MPI_COMM_WORLD);
+        MPI_Send(buf, num, mpi_type<T>::id(), target, tag, m_comm);
         count_traffic_tx(target, num * sizeof(T));
     }
 
@@ -100,7 +108,7 @@ public:
     template<typename T>
     MPI_Status recv(T* buf, size_t num, size_t source, int tag = 0) {
         MPI_Status st;
-        MPI_Recv(buf, num, mpi_type<T>::id(), source, tag, MPI_COMM_WORLD, &st);
+        MPI_Recv(buf, num, mpi_type<T>::id(), source, tag, m_comm, &st);
         count_traffic_rx(source, num * sizeof(T));
         return st;
     }
@@ -115,7 +123,7 @@ public:
     template<typename T>
     MPI_Request isend(const T *buf, size_t num, size_t target, int tag = 0) {
         MPI_Request req;
-        MPI_Isend(buf, num, mpi_type<T>::id(), target, tag, MPI_COMM_WORLD, &req);
+        MPI_Isend(buf, num, mpi_type<T>::id(), target, tag, m_comm, &req);
         count_traffic_tx(target, num * sizeof(T));
         return req;
     }
@@ -123,12 +131,12 @@ public:
     template<typename T>
     ProbeResult probe(size_t source = MPI_ANY_SOURCE, int tag = 0) {
         MPI_Status st;
-        MPI_Probe(source, tag, MPI_COMM_WORLD, &st);
+        MPI_Probe(source, tag, m_comm, &st);
 
         int size;
         MPI_Get_count(&st, mpi_type<T>::id(), &size);
 
-        return ProbeResult{ (size_t)size, (size_t)st.MPI_SOURCE };
+        return ProbeResult{ true, (size_t)size, (size_t)st.MPI_SOURCE };
     }
 
     template<typename T>
@@ -139,7 +147,7 @@ public:
     template<typename T>
     inline void all_reduce(const T* sbuf, T* rbuf, size_t num, MPI_Op op = MPI_SUM) {
         // allreduce
-        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, MPI_COMM_WORLD);
+        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, m_comm);
 
         // estimate TX/RX
         const size_t num_responsible = std::min(num, num_workers());
@@ -165,6 +173,16 @@ public:
 
         m_local_traffic.tx_est += traffic;
         m_local_traffic.rx_est += traffic;
+    }
+
+    template<typename T>
+    inline void all_reduce(std::vector<T>& v, MPI_Op op = MPI_SUM) {
+        T* rbuf = new T[v.size()];
+        all_reduce(v.data(), rbuf, v.size(), op);
+        for(size_t i = 0; i < v.size(); i++) {
+            v[i] = rbuf[i];
+        }
+        delete[] rbuf;
     }
 
     void synchronize();

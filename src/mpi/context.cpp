@@ -16,7 +16,8 @@ void MPIContext::on_free(size_t size) {
 }
 
 MPIContext::MPIContext(int* argc, char*** argv)
-    : m_alloc_current(0),
+    : m_comm(MPI_COMM_WORLD),
+      m_alloc_current(0),
       m_alloc_max(0),
       m_local_traffic({0,0,0,0,0,0}) {
 
@@ -28,13 +29,7 @@ MPIContext::MPIContext(int* argc, char*** argv)
     }
 
     MPI_Init(argc, argv);
-    int inum_workers, irank;
-
-    MPI_Comm_size(MPI_COMM_WORLD, &inum_workers);
-    MPI_Comm_rank(MPI_COMM_WORLD, &irank);
-
-    m_rank = (size_t)irank;
-    m_num_workers = (size_t)inum_workers;
+    set_comm(MPI_COMM_WORLD);
 
     // determine workers per node via shared memory group size
     // we expect that this is the same on each node
@@ -47,11 +42,13 @@ MPIContext::MPIContext(int* argc, char*** argv)
         MPI_Comm_size(shmcomm, &shmsize);
 
         m_workers_per_node = (size_t)shmsize;
+
+        MPI_Comm_free(&shmcomm);
     }
 
     // initial synchronization
     MPI_Barrier(MPI_COMM_WORLD);
-    m_start_time = util::time();
+    m_start_time = MPI_Wtime();
 
     cout_master() << "MPIContext initialized with "
         << num_workers() << " workers on "
@@ -95,11 +92,23 @@ void MPIContext::track_free(size_t size) {
     m_alloc_current -= size;
 }
 
+void MPIContext::set_comm(MPI_Comm comm) {
+    m_comm = comm;
+
+    //
+    int inum_workers, irank;
+
+    MPI_Comm_size(m_comm, &inum_workers);
+    MPI_Comm_rank(m_comm, &irank);
+
+    m_rank = (size_t)irank;
+    m_num_workers = (size_t)inum_workers;
+}
+
 std::ostream& MPIContext::cout() const {
-    const double local_dt = util::time() - m_start_time;
     return (std::cout <<
         "[#" << m_rank <<
-        " @" << std::setprecision(3) << std::fixed << local_dt << "] ");
+        " @" << std::setprecision(3) << std::fixed << time() << "] ");
 }
 
 std::ostream& MPIContext::cout(bool b) const {
@@ -107,7 +116,7 @@ std::ostream& MPIContext::cout(bool b) const {
 }
 
 void MPIContext::synchronize() {
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(m_comm);
 }
 
 size_t MPIContext::gather_max_alloc() const {
