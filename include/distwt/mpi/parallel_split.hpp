@@ -8,7 +8,7 @@
 
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/prefix_sum.hpp>
-#include <distwt/mpi/uint64_pack.hpp>
+#include <distwt/mpi/uint64_pack_str8.hpp>
 
 //#define DBG_PARSPLIT 1
 
@@ -117,8 +117,6 @@ size_t parallel_str_split(
     #endif
 
     // allocate message buffer
-    using str8_pack_t = uint64_pack_t<unsigned char[8], 8>;
-
     // TODO: tighter bound than #targets?
     uint64_t** msg_buf = new uint64_t*[targets];
     size_t msg_num = 0;

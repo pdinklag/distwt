@@ -1,7 +1,12 @@
+#include <cassert>
+
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
 
 #include <distwt/mpi/prefix_sum.hpp>
+#include <distwt/mpi/uint64_pack_bv64.hpp>
+
+//#define DBG_MERGE 1
 
 WaveletTreeLevelwise WaveletTreeNodebased::merge(
     MPIContext& ctx,
@@ -47,11 +52,10 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                 const size_t num_level_nodes = 1ULL << level;
                 const size_t first_level_node = num_level_nodes;
 
-                // outbox buffer
-                // needs to be of fixed size to avoid destructor calls
-                // FIXME: better design?
-                std::vector<bv_interval_msg_t> msg_outbox(2ULL * num_level_nodes);
-                size_t msg_out_num = 0;
+                // allocate message buffers
+                // TODO: tighter bound?
+                uint64_t** msg_buf = new uint64_t*[ctx.num_workers() * num_level_nodes];
+                size_t msg_num = 0;
 
                 // determine which bits from this worker go to other workers
                 size_t level_node_offs = 0;
@@ -63,53 +67,43 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                         const size_t glob_node_offs =
                             level_node_offs + local_node_offs[node_id-1];
 
-                        // sender
-                        auto send = [&](const size_t target,
-                            const bv_t& bv,size_t p, size_t q){
+                        // map range of the local node's bit vector
+                        // in global level's bit vector
+                        size_t p = glob_node_offs;
+                        const size_t q = p + bv.size();
 
-                            const size_t num = q - p + 1;
-                            const size_t local_p = p - glob_node_offs;
-                            const size_t local_q = local_p + num - 1;
+                        while(p < q) {
+                            // determine target
+                            const size_t target = p / bits_per_worker;
 
-                            /*
-                            ctx.cout() << "Send [" << p << "," << q << "] ("
-                                << "local [" << local_p << "," << local_q << "]) ("
+                            // determine next boundary
+                            const size_t x = std::min(
+                                (target+1) * bits_per_worker, q);
+
+                            // send interval [p,x) to target
+                            const size_t local_offs = p - glob_node_offs;
+                            const size_t num = x - p;
+
+                            #ifdef DBG_MERGE
+                            ctx.cout() << "Send [" << p << "," << x << ") ("
                                 << num << " bits) of level " << (level+1)
                                 << " (node " << node_id << ")"
                                 << " to #" << target << std::endl;
-                            */
+                            #endif
 
-                            auto& msg = msg_outbox[msg_out_num++];
+                            const size_t size =
+                                bv64_pack_t::required_bufsize(num)+2;
 
-                            encode_bv_interval_msg(
-                                msg, bv, local_p, local_q, p, q);
+                            uint64_t* msg = new uint64_t[size];
+                            msg[0] = p;
+                            msg[1] = num;
+                            bv64_pack_t::pack(bv, local_offs, msg+2, num);
+                            msg_buf[msg_num++] = msg;
 
-                            ctx.isend(msg.data, msg.size, target, level);
-                        };
+                            ctx.isend(msg, size, target, (int)level);
 
-                        // find range of the local node's bit vector
-                        // in global level's bit vector
-                        const size_t p = glob_node_offs;
-                        const size_t q = p + bv.size() - 1;
-
-                        // find target workers for my local range
-                        // LEMMA: there can be at most two of them, because the node
-                        //        has at most bits_per_worker bits
-                        const size_t target1 = p / bits_per_worker;
-                        const size_t target2 = q / bits_per_worker;
-
-                        if(target1 == target2) {
-                            // send bv[p..q] bits to target
-                            send(target1, bv, p, q);
-                        } else {
-                            // split it up at the boundary m
-                            const size_t m = target2 * bits_per_worker;
-
-                            // send bv[p..m-1] to target1
-                            send(target1, bv, p, m-1);
-
-                            // send bv[m..q] to target2
-                            send(target2, bv, m, q);
+                            // advance in node
+                            p = x;
                         }
 
                         if(discard) {
@@ -119,53 +113,62 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                         }
                     }
 
-                    // advance
+                    // advance in level
                     level_node_offs += m_node_sizes[node_id-1];
                 }
 
                 // allocate level bv
-                bits[level].resize(input.local_num());
-
-                // receiver
-                size_t bits_received = 0;
-
-                const size_t glob_offs = ctx.rank() * bits_per_worker;
-                auto recv = [&](const bv_interval_msg_t& msg, const size_t source){
-                    // DEBUG
-                    /*
-                    const size_t p = msg.data[0];
-                    const size_t q = msg.data[1];
-                    const size_t num = q-p+1;
-                    ctx.cout() << "Receive [" << p << "," << q
-                        << "] (" << num << " bits) of level " << (level+1)
-                        << " from #" << source
-                        << " (glob_offs = " << glob_offs << ")" << std::endl;
-                    */
-
-                    bits_received += decode_bv_interval_msg(
-                        msg, bits[level], glob_offs);
-
-                    // DEBUG
-                    /*
-                    ctx.cout() << "got " << bits_received << " / "
-                        << input.local_num() << " bits" << std::endl;
-                    */
-                };
+                const size_t local_num = input.local_num();
+                bits[level].resize(local_num);
 
                 // receive messages until local_num bits have been received
-                while(bits_received < input.local_num()) {
-                    auto r = ctx.template probe<uint64_t>((int)level);
+                const size_t global_offset = ctx.rank() * bits_per_worker;
 
-                    if(r.size > 0) {
-                        bv_interval_msg_t msg(r.size);
-                        ctx.recv(msg.data, msg.size, r.sender, level);
-                        recv(msg, r.sender);
-                    }
+                size_t num_received = 0;
+                while(num_received < local_num) {
+                    // probe for message (blocking)
+                    auto result = ctx.template probe<uint64_t>((int)level);
+
+                    uint64_t* msg = new uint64_t[result.size];
+                    ctx.recv(msg, result.size, result.sender, (int)level);
+
+                    const size_t moffs = msg[0];
+                    const size_t mnum = msg[1];
+
+                    assert(result.size == bv64_pack_t::required_bufsize(mnum) + 2);
+
+                    // receive global interval [moffs, moffs+mnum)
+                    #ifdef DBG_MERGE
+                    ctx.cout() << "receive ["
+                        << moffs << ","
+                        << moffs + mnum
+                        << ") (" << mnum << " bits) from "
+                        << result.sender << std::endl;
+                    #endif
+
+                    assert(moffs >= global_offset);
+                    assert(moffs - global_offset + mnum <= local_num);
+
+                    bv64_pack_t::unpack(
+                        msg+2, bits[level], moffs - global_offset, mnum);
+
+                    num_received += mnum;
+
+                    #ifdef DBG_MERGE
+                    ctx.cout() << "got " << num_received << " / "
+                        << local_num << " bits" << std::endl;
+                    #endif
                 }
 
                 // this synchronization is necessary in order to maintain the
                 // outbox buffer until all messages have been received
                 ctx.synchronize();
+
+                // clean up
+                for(size_t i = 0; i < msg_num; i++) {
+                    delete[] msg_buf[i];
+                }
+                delete[] msg_buf;
             }
         }
 

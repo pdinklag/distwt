@@ -7,15 +7,13 @@ class uint64_pack_t {
 private:
     static_assert(sizeof(items_t) == 8, "items_t must be 64 bits in size.");
 
-    union pack_t {
-        uint64_t packed;
-        items_t items;
-    };
-
 public:
     static inline size_t required_bufsize(const size_t num_items) {
         return tlx::div_ceil(num_items, N);
     }
+
+    static uint64_t pack_uint64(const items_t& items);
+    static void unpack_uint64(uint64_t u64, items_t& items);
 
     template<typename src_t>
     static void pack(
@@ -24,22 +22,22 @@ public:
         uint64_t* dst,
         const size_t num) {
 
-        pack_t buf;
+        items_t buf;
         size_t count = 0;
 
         // write items into buffer
         for(size_t i = 0; i < num; i++) {
-            buf.items[count++] = src[src_offs + i];
+            buf[count++] = src[src_offs + i];
             if(count >= N) {
                 // buffer full, write to destination
-                *dst++ = buf.packed;
+                *dst++ = pack_uint64(buf);
                 count = 0;
             }
         }
 
         // remainder
         if(count > 0) {
-            *dst++ = buf.packed;
+            *dst++ = pack_uint64(buf);
         }
     }
 
@@ -50,17 +48,17 @@ public:
         const size_t dst_offs,
         const size_t num) {
 
-        pack_t buf;
+        items_t buf;
         size_t count = N;
 
         // read items into buffer
         for(size_t i = 0; i < num; i++) {
             if(count >= N) {
-                buf.packed = *src++;
+                unpack_uint64(*src++, buf);
                 count = 0;
             }
 
-            dst[dst_offs + i] = buf.items[count++];
+            dst[dst_offs + i] = buf[count++];
         }
     }
 };
