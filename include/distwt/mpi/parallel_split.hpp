@@ -117,6 +117,8 @@ size_t parallel_str_split(
     #endif
 
     // allocate message buffer
+    using str8_pack_t = uint64_pack_t<unsigned char[8], 8>;
+
     // TODO: tighter bound than #targets?
     uint64_t** msg_buf = new uint64_t*[targets];
     size_t msg_num = 0;
@@ -138,12 +140,12 @@ size_t parallel_str_split(
 
         // split and send data
         auto send_interval = [&](const bool b, const size_t to){
-            const size_t size = str8_pack_t::bufsize(count[b])+2;
+            const size_t size = str8_pack_t::required_bufsize(count[b])+2;
 
             uint64_t* msg = new uint64_t[size];
             msg[0] = glob[b];
             msg[1] = count[b];
-            pack_uint64<str8_pack_t>(buf[b], 0, msg+2, count[b]);
+            str8_pack_t::pack(buf[b], 0, msg+2, count[b]);
             msg_buf[msg_num++] = msg;
 
             ctx.isend(msg, size, to, tag);
@@ -239,7 +241,7 @@ size_t parallel_str_split(
             const size_t moffs = msg[0];
             const size_t mnum = msg[1];
 
-            assert(result.size == str8_pack_t::bufsize(mnum) + 2);
+            assert(result.size == str8_pack_t::required_bufsize(mnum) + 2);
 
             // receive global interval [moffs, moffs+mnum)
             #ifdef DBG_PARSPLIT
@@ -253,9 +255,7 @@ size_t parallel_str_split(
             assert(moffs >= global_offset);
             assert(moffs - global_offset + mnum <= data.size());
 
-            unpack_uint64<str8_pack_t>(
-                msg+2, data, moffs - global_offset, mnum);
-
+            str8_pack_t::unpack(msg+2, data, moffs - global_offset, mnum);
             num_received += mnum;
         }
         assert(num_received == expect);
