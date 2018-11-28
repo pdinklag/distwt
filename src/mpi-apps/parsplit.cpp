@@ -22,9 +22,7 @@ void recursiveWT(
     const size_t node_id,
     std::vector<esym_t>& text,
     const size_t a,
-    const size_t b,
-    const size_t m_min,
-    const size_t m_max) {
+    const size_t b) {
 
     if(a == b) return;
 
@@ -32,7 +30,7 @@ void recursiveWT(
 
     // compute node bit vector
     ctx.cout_master() << "Processing node " << node_id << " using "
-        << (m_max - m_min + 1) << " worker(s) ..." << std::endl;
+        << ctx.num_workers() << " worker(s) ..." << std::endl;
 
     const size_t n = text.size();
     size_t z = 0;
@@ -57,7 +55,6 @@ void recursiveWT(
             text,
             [m](const esym_t& x){return (x > m);},
             z, n-z,
-            m_min, m_max,
             (int)node_id);
 
         // create communicators for left and right groups
@@ -68,10 +65,10 @@ void recursiveWT(
             MPI_Group parent_group;
             MPI_Comm_group(parent_comm, &parent_group);
 
-            const size_t num_l = split - m_min;
+            const size_t num_l = split;
             int ranks_l[num_l];
             for(size_t i = 0; i < num_l; i++) {
-                ranks_l[i] = int(m_min + i);
+                ranks_l[i] = int(i);
             }
 
             // left
@@ -93,8 +90,7 @@ void recursiveWT(
                     ctx,
                     2ULL * node_id,
                     text,
-                    a, m,
-                    0, ctx.num_workers()-1);
+                    a, m);
             } else {
                 // recurse with right child in right group
                 ctx.set_comm(target_comm_r);
@@ -103,8 +99,7 @@ void recursiveWT(
                     ctx,
                     2ULL * node_id + 1,
                     text,
-                    m+1, b,
-                    0, ctx.num_workers()-1);
+                    m+1, b);
             }
 
             // restore communicator
@@ -210,8 +205,7 @@ int main(int argc, char** argv) {
             ctx,
             1ULL, // root
             etext, // text
-            0ULL, wt.num_nodes(), // alphabet interval
-            0ULL, ctx.num_workers()-1); // worker interval
+            0ULL, wt.num_nodes()); // alphabet interval
     });
 
     // Clean up

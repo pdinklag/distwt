@@ -29,17 +29,11 @@ size_t parallel_str_split(
     predicate_f predicate,
     const size_t local_num0,
     const size_t local_num1,
-    const size_t target_min,
-    const size_t target_max,
     const int tag) {
 
     // must have at least 2 targets
-    // FIXME: really?
-    assert(target_min < target_max);
-    const size_t targets = target_max - target_min + 1;
-
-    // local worker must be within the target range
-    assert(ctx.rank() >= target_min && ctx.rank() <= target_max);
+    const size_t targets = ctx.num_workers();
+    assert(targets >= 2);
 
     // data must be consistent
     assert(local_num0 + local_num1 == data.size());
@@ -128,8 +122,8 @@ size_t parallel_str_split(
         };
         std::array<size_t, 2> glob = {offs[0], offs[1]};
         std::array<size_t, 2> target = {
-            num_per_target[0] == 0 ? SIZE_MAX : target_min + glob[0] / num_per_target[0],
-            num_per_target[1] == 0 ? SIZE_MAX : target_min + targets0 + glob[1] / num_per_target[1]
+            num_per_target[0] == 0 ? SIZE_MAX : glob[0] / num_per_target[0],
+            num_per_target[1] == 0 ? SIZE_MAX : targets0 + glob[1] / num_per_target[1]
         };
         std::array<size_t, 2> p = {glob[0], glob[1]};
         std::array<size_t, 2> count = {0, 0};
@@ -191,14 +185,14 @@ size_t parallel_str_split(
     // receive phase
     {
         // get global role (0/1 and offset)
-        const bool b = (ctx.rank() >= target_min + targets0);
+        const bool b = (ctx.rank() >= targets0);
         const size_t global_offset = b
-            ? (ctx.rank() - target_min - targets0) * num_per_target[1]
-            : (ctx.rank() - target_min) * num_per_target[0];
+            ? (ctx.rank() - targets0) * num_per_target[1]
+            : (ctx.rank()) * num_per_target[0];
 
         size_t expect;
         {
-            std::array<size_t, 2> last = {target_min+targets0-1, target_max};
+            std::array<size_t, 2> last = {targets0-1, ctx.num_workers()-1};
             if(ctx.rank() < last[b]) {
                 expect = num_per_target[b];
             } else {
@@ -266,5 +260,5 @@ size_t parallel_str_split(
     }
 
     // return splitter
-    return target_min + targets0;
+    return targets0;
 }
