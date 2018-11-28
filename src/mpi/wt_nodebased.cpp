@@ -54,8 +54,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
 
                 // allocate message buffers
                 // TODO: tighter bound?
-                uint64_t** msg_buf = new uint64_t*[ctx.num_workers() * num_level_nodes];
-                size_t msg_num = 0;
+                std::vector<uint64_t*> msg_buf;
 
                 // determine which bits from this worker go to other workers
                 size_t level_node_offs = 0;
@@ -98,7 +97,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                             msg[0] = p;
                             msg[1] = num;
                             bv64_pack_t::pack(bv, local_offs, msg+2, num);
-                            msg_buf[msg_num++] = msg;
+                            msg_buf.push_back(msg);
 
                             ctx.isend(msg, size, target, (int)level);
 
@@ -165,10 +164,9 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                 ctx.synchronize();
 
                 // clean up
-                for(size_t i = 0; i < msg_num; i++) {
-                    delete[] msg_buf[i];
+                for(uint64_t* msg : msg_buf) {
+                    delete[] msg;
                 }
-                delete[] msg_buf;
             }
         }
 

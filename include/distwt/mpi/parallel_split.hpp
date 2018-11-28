@@ -117,9 +117,7 @@ size_t parallel_str_split(
     #endif
 
     // allocate message buffer
-    // TODO: tighter bound than #targets?
-    uint64_t** msg_buf = new uint64_t*[targets];
-    size_t msg_num = 0;
+    std::vector<uint64_t*> msg_buf;
 
     // send phase
     {
@@ -144,7 +142,7 @@ size_t parallel_str_split(
             msg[0] = glob[b];
             msg[1] = count[b];
             str8_pack_t::pack(buf[b], 0, msg+2, count[b]);
-            msg_buf[msg_num++] = msg;
+            msg_buf.push_back(msg);
 
             ctx.isend(msg, size, to, tag);
         };
@@ -263,10 +261,9 @@ size_t parallel_str_split(
     ctx.synchronize();
 
     // clean up
-    for(size_t i = 0; i < msg_num; i++) {
-        delete[] msg_buf[i];
+    for(uint64_t* msg : msg_buf) {
+        delete[] msg;
     }
-    delete[] msg_buf;
 
     // return splitter
     return target_min + targets0;
