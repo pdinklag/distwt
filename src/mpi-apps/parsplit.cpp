@@ -11,6 +11,7 @@
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/parallel_split.hpp>
+#include <distwt/mpi/wt_construct_sequential.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
 
@@ -26,12 +27,35 @@ void recursiveWT(
 
     if(a == b) return;
 
-    const size_t m = (a + b) / 2;
-
-    // compute node bit vector
     ctx.cout_master() << "Processing node " << node_id << " using "
         << ctx.num_workers() << " worker(s) ..." << std::endl;
 
+    if(ctx.num_workers() == 1) {
+        // we are left with only one worker
+        // this may happen based on the balance of 0/1 bits in a bit vector
+        // simply use a sequential algorithm to compute the remaining WT
+
+        // allocate buffer
+        esym_t* buffer = new esym_t[text.size()];
+
+        // compute sequential
+        wt_construct_nodebased_sequential(
+            bits,
+            ctx,
+            node_id,
+            text.data(),
+            text.size(),
+            a, b,
+            buffer);
+
+        // clean up and return
+        delete[] buffer;
+        return;
+    }
+
+    const size_t m = (a + b) / 2;
+
+    // compute node bit vector
     const size_t n = text.size();
     size_t z = 0;
     {
@@ -168,7 +192,7 @@ int main(int argc, char** argv) {
     Histogram hist(ctx, input, rdbufsize);
 
     // check if enough workers are available
-    {
+    /*{
         const size_t sigma = hist.size();
         const size_t wt_height = tlx::integer_log2_ceil(sigma - 1);
         const size_t min_workers = 1ULL << wt_height;
@@ -180,7 +204,7 @@ int main(int argc, char** argv) {
 
             return 1;
         }
-    }
+    }*/
 
     // Compute effective alphabet
     EffectiveAlphabet ea(hist);

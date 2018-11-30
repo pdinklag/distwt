@@ -45,11 +45,7 @@ size_t parallel_str_split(
     // split items in a balanced manner
     const size_t num_total = num[0] + num[1];
 
-    // FIXME: Computing a 0/1 ratio may result in only one target being
-    // available for further computation on either side. This MUST be avoided
-    // in case we aren't on the final level of the WT yet. Some sort of a
-    // minimum (other than 0) would be required.
-    /*
+    // compute amount of workers for 0/1 parts based on ratio
     const double p0 = (double)num[0] / (double)num_total;
     const size_t ceil0 = std::ceil(p0 * (double)targets);
     const size_t targets0 = (num[1] > 0) ? std::min(ceil0, targets-1) : ceil0;
@@ -57,24 +53,6 @@ size_t parallel_str_split(
 
     if(num[0] > 0) assert(targets0 > 0);
     if(num[1] > 0) assert(targets1 > 0);
-
-    std::array<size_t, 2> num_per_target = {
-        targets0 == 0 ? 0 : tlx::div_ceil(num[0], targets0),
-        targets1 == 0 ? 0 : tlx::div_ceil(num[1], targets1)
-    };
-    */
-
-    size_t targets0, targets1;
-    if(num[0] > 0 && num[1] > 0) {
-        targets0 = targets / 2;
-        targets1 = targets - targets0;
-    } else if(num[0] == 0) {
-        targets0 = 0;
-        targets1 = targets;
-    } else { //if(num[1] == 0) {
-        targets0 = targets;
-        targets1 = 0;
-    }
 
     std::array<size_t, 2> num_per_target = {
         targets0 == 0 ? 0 : tlx::div_ceil(num[0], targets0),
@@ -88,7 +66,7 @@ size_t parallel_str_split(
     ctx.cout_master()
         << "num[0]=" << num[0]
         << ", num[1]=" << num[1] << std::endl;
-        //<< ", p0=" << p0 << std::endl;
+        << ", p0=" << p0 << std::endl;
     ctx.cout_master()
         << "target_min=" << target_min
         << ", target_max=" << target_max << std::endl;
