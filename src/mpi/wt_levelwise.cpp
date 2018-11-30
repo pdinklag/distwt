@@ -1,5 +1,6 @@
 #include <distwt/mpi/wt_levelwise.hpp>
 
+#include <bitset>
 #include <iomanip>
 #include <mpi.h>
 
