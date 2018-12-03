@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
-    const double t0 = MPI_Wtime();
+    const double t0 = ctx.time();
 
     // Determine input partition
     FilePartitionReader input(ctx, input_filename);
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    const double dt = MPI_Wtime();
+    const double dt = ctx.time() - t0;
     Result result("mpi-dd", ctx, input, dt);
 
     ctx.cout_master() << result.sqlplot() << std::endl;
