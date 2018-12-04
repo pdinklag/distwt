@@ -1,3 +1,7 @@
+# Hello
+add_executable(thrill-hello hello.cpp)
+target_link_libraries(thrill-hello ${THRILL_APP_DEPENDENCIES})
+
 # Sort
 add_executable(thrill-sort sort.cpp)
 target_link_libraries(thrill-sort ${THRILL_APP_DEPENDENCIES})
