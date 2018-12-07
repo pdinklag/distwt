@@ -157,6 +157,9 @@ int main(int argc, char** argv) {
     std::string output("");
     cp.add_string('o', "output", output, "Name of output file.");
 
+    size_t prefix = SIZE_MAX; // default to whole file
+    cp.add_bytes('p', "prefix", prefix, "Only process prefix of input file.");
+
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
     if (!cp.process(argc, argv)) {
@@ -168,7 +171,7 @@ int main(int argc, char** argv) {
     const double t0 = ctx.time();
 
     // Determine input partition
-    FilePartitionReader input(ctx, input_filename);
+    FilePartitionReader input(ctx, input_filename, prefix);
     const size_t local_num = input.local_num();
 
     if(rdbufsize == 0) {
@@ -190,21 +193,6 @@ int main(int argc, char** argv) {
     // Compute histogram
     ctx.cout_master() << "Compute histogram ..." << std::endl;
     Histogram hist(ctx, input, rdbufsize);
-
-    // check if enough workers are available
-    /*{
-        const size_t sigma = hist.size();
-        const size_t wt_height = tlx::integer_log2_ceil(sigma - 1);
-        const size_t min_workers = 1ULL << wt_height;
-
-        if(ctx.num_workers() < min_workers) {
-            ctx.cout_master() << "Not enough workers available! (sigma = "
-                << sigma << " -> " << min_workers << " workers required)"
-                << std::endl;
-
-            return 1;
-        }
-    }*/
 
     // Compute effective alphabet
     EffectiveAlphabet ea(hist);

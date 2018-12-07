@@ -30,6 +30,9 @@ int main(int argc, char** argv) {
     std::string output("");
     cp.add_string('o', "output", output, "Name of output file.");
 
+    size_t prefix = SIZE_MAX; // default to whole file
+    cp.add_bytes('p', "prefix", prefix, "Only process prefix of input file.");
+
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
     if (!cp.process(argc, argv)) {
@@ -41,7 +44,7 @@ int main(int argc, char** argv) {
     const double t0 = ctx.time();
 
     // Determine input partition
-    FilePartitionReader input(ctx, input_filename);
+    FilePartitionReader input(ctx, input_filename, prefix);
     const size_t local_num = input.local_num();
 
     if(rdbufsize == 0) {

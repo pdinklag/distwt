@@ -6,10 +6,11 @@
 
 FilePartitionReader::FilePartitionReader(
     const MPIContext& ctx,
-    const std::string& filename)
+    const std::string& filename,
+    const size_t prefix)
     : m_filename(filename), m_rank(ctx.rank()), m_extracted(false) {
 
-    m_total_size = util::file_size(m_filename);
+    m_total_size = std::min(util::file_size(m_filename), prefix);
     m_size_per_worker = tlx::div_ceil(m_total_size, size_t(ctx.num_workers()));
 
     m_local_offset = m_size_per_worker * size_t(ctx.rank());

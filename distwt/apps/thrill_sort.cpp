@@ -32,7 +32,8 @@ void Process(
     std::string output) {
 
     // load raw text
-    auto rawtext = thrill::api::ReadBinary<rawsym_t>(ctx, input).Cache();
+    auto rawtext = thrill::api::ReadBinary<rawsym_t>(
+        ctx, input, input_size).Cache();
 
     // compute histogram
     Histogram hist(rawtext);
@@ -97,6 +98,9 @@ int main(int argc, const char** argv) {
     cp.add_param_string("file", input_filename, "The input file.");
     cp.add_string('o', "out", output_filename, "The base output filename.");
 
+    size_t prefix = SIZE_MAX; // default to whole file
+    cp.add_bytes('p', "prefix", prefix, "Only process prefix of input file.");
+
     if (!cp.process(argc, argv)) {
         return -1;
     }
@@ -105,7 +109,9 @@ int main(int argc, const char** argv) {
     return thrill::Run([&](thrill::Context& ctx) {
         thrill::common::StatsTimer timer(true);
 
-        const size_t input_size = util::file_size(input_filename);
+        const size_t input_size = std::min(
+            util::file_size(input_filename), prefix);
+
         Process(
             ctx,
             input_filename,

@@ -15,7 +15,10 @@ private:
     std::string m_local_filename;
 
 public:
-    FilePartitionReader(const MPIContext& ctx, const std::string& filename);
+    FilePartitionReader(
+        const MPIContext& ctx,
+        const std::string& filename,
+        const size_t prefix = SIZE_MAX);
 
     inline const std::string& filename() const { return m_filename; }
     inline size_t total_size() const { return m_total_size; }
