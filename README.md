@@ -14,23 +14,23 @@ Here's a quick roundup of the generated binaries.
 More details will follow in my master's thesis, which is due in February 2019 and will be published some time after.
 
 ### WT Construction
-By default, the WT is constructed only in RAM (or semi-externally at Thrill's discretion). All binaries accept a `-o <file>` command line parameter to specify an output file. See below for details on the output.
+By default, the WT is constructed only in RAM (or semi-externally at Thrill's discretion). All binaries accept a `-o <file>` command line parameter to specify an output file, as well as the `-p <bytes>` parameter to tell them to process only that specified prefix of the input file. See below for details on the output.
 
 Binary | Description
 ------ | -----------
-`src/mpi-apps/mpi-dd` | Domain decomposition in MPI.
-`src/mpi-apps/mpi-parsplit` | Weighted parallel split approach in MPI.
-`src/thrill-apps/thrill-dd` | Implicit domain decomposition in Thrill.
-`src/thrill-apps/thrill-flat-dd` | Implicit domain decomposition in Thrill (non-recursive).
-`src/thrill-apps/thrill-sort` | Stable sorting on each level in Thrill.
+`mpi-dd` | Domain decomposition in MPI.
+`mpi-parsplit` | Weighted parallel split approach in MPI.
+`thrill-dd` | Implicit domain decomposition in Thrill.
+`thrill-flat-dd` | Implicit domain decomposition in Thrill (non-recursive).
+`thrill-sort` | Stable sorting on each level in Thrill.
 
 The `mpi` binaries accept the `-l <local_file>` parameter. If given, a worker's local part of the input file will be extracted to `local_file` in a preliminary step, so "chaotic" parallel access to the input, which may have heavy hits on the performance, can be avoided.
 
 ### Helpers
 Binary | Description
 ------ | -----------
-`src/thrill-apps/verify-levelwise` | Verifies a levelwise WT on disk against a source file.
-`src/tools/alloc-test` | Tests how much memory can be allocated and written on the system.
+`alloc-test` | Tests how much memory can be allocated and written on the system.
+`verify-levelwise` | Verifies a levelwise WT on disk against a source file.
 
 The verifier simulates an *access* operations on all positions of the input text and compares the results to the source file, thus verifying the correctness of the wavelet tree. Note that currently, the verifier must use the same amount of workers that were used to generate the output.
 
