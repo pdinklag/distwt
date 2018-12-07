@@ -52,7 +52,7 @@ public:
     MPIContext(int* argc, char*** argv);
     ~MPIContext();
 
-    inline double time() const { return util::time() - m_start_time; }
+    inline double time() const { return MPI_Wtime(); }
 
     inline size_t num_workers() const { return m_num_workers; }
     inline size_t rank() const { return m_rank; }
