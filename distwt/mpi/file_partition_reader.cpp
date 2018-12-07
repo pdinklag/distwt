@@ -8,7 +8,10 @@ FilePartitionReader::FilePartitionReader(
     const MPIContext& ctx,
     const std::string& filename,
     const size_t prefix)
-    : m_filename(filename), m_rank(ctx.rank()), m_extracted(false) {
+    : m_ctx(&ctx),
+      m_filename(filename),
+      m_rank(ctx.rank()),
+      m_extracted(false) {
 
     m_total_size = std::min(util::file_size(m_filename), prefix);
     m_size_per_worker = tlx::div_ceil(m_total_size, size_t(ctx.num_workers()));
@@ -32,7 +35,7 @@ bool FilePartitionReader::extract_local(
         // open global file for read and seek
         MPI_File fr;
         MPI_File_open(
-            MPI_COMM_WORLD,
+            m_ctx->comm(),
             m_filename.c_str(),
             MPI_MODE_RDONLY,
             MPI_INFO_NULL,
@@ -91,7 +94,7 @@ void FilePartitionReader::process_local(
     } else {
         // open original file and seek position
         MPI_File_open(
-            MPI_COMM_WORLD,
+            m_ctx->comm(),
             m_filename.c_str(),
             MPI_MODE_RDONLY,
             MPI_INFO_NULL,

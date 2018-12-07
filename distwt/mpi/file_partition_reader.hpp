@@ -6,6 +6,8 @@
 
 class FilePartitionReader {
 private:
+    const MPIContext* m_ctx;
+
     std::string m_filename;
     size_t m_total_size, m_size_per_worker;
 
