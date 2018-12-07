@@ -129,8 +129,8 @@ int main(int argc, const char** argv) {
         timer.Stop();
         Result result("thrill-flat-dd", ctx, input_filename, input_size, timer.SecondsDouble());
         if(ctx.my_rank() == 0) {
-            LOG1 << result.sqlplot();
             LOG1 << result.readable();
+            std::cout << result.sqlplot() << std::endl;
         }
     });
 }

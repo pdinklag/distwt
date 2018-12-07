@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
     const double dt = ctx.time() - t0;
     Result result("mpi-parsplit", ctx, input, dt);
 
-    ctx.cout_master() << result.sqlplot() << std::endl;
-    ctx.cout_master() << result.readable() << std::endl;
+    ctx.cout_master() << result.readable() << std::endl
+                      << result.sqlplot() << std::endl;
     return 0;
 }
