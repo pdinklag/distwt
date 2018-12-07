@@ -21,6 +21,6 @@ include_directories(${MPI_INCLUDE_PATH})
 include_directories(${TLX_INCLUDE_DIRS})
 include_directories(${FOXXL_INCLUDE_DIRS})
 include_directories(${THRILL_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-add_subdirectory(src)
+add_subdirectory(distwt)
