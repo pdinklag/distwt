@@ -16,6 +16,9 @@ int main(int argc, const char** argv) {
     std::string filename; // required
     cp.add_param_string("file", filename, "The input file.");
 
+    size_t rbufsize = 4ULL * 1024ULL * 1024ULL; // 4Mi
+    cp.add_bytes('r', "rbuf", rbufsize, "The read buffer size");
+
     if (!cp.process(argc, argv)) {
         return -1;
     }
@@ -24,15 +27,20 @@ int main(int argc, const char** argv) {
     size_t total = 0;
     std::array<size_t, N> hist{};
     {
+        unsigned char rbuf[rbufsize];
         std::ifstream in(filename, std::ios::binary);
 
-        while(true) {
-            unsigned char c;
-            in.get((char&)c);
-            if(in.eof()) break;
+        bool eof = false;
+        while(!eof) {
+            in.read((char*)rbuf, rbufsize);
+            
+            const size_t num = in.gcount();
+            eof = in.eof();
 
-            ++hist[c];
-            ++total;
+            total += num;
+            for(size_t i = 0; i < num; i++) {
+                ++hist[rbuf[i]];
+            }
         }
     }
 
