@@ -16,7 +16,7 @@ int main(int argc, const char** argv) {
     std::string filename; // required
     cp.add_param_string("file", filename, "The input file.");
 
-    size_t rbufsize = 4ULL * 1024ULL * 1024ULL; // 4Mi
+    size_t rbufsize = 16ULL * 1024ULL * 1024ULL; // 16Mi
     cp.add_bytes('r', "rbuf", rbufsize, "The read buffer size");
 
     if (!cp.process(argc, argv)) {
@@ -27,21 +27,23 @@ int main(int argc, const char** argv) {
     size_t total = 0;
     std::array<size_t, N> hist{};
     {
-        unsigned char rbuf[rbufsize];
+        char* rbuf = new char[rbufsize];
         std::ifstream in(filename, std::ios::binary);
 
         bool eof = false;
         while(!eof) {
-            in.read((char*)rbuf, rbufsize);
-            
+            in.read(rbuf, rbufsize);
+
             const size_t num = in.gcount();
             eof = in.eof();
 
             total += num;
             for(size_t i = 0; i < num; i++) {
-                ++hist[rbuf[i]];
+                ++hist[(unsigned char)rbuf[i]];
             }
         }
+
+        delete[] rbuf;
     }
 
     // print histogram
