@@ -206,6 +206,9 @@ int main(int argc, char** argv) {
     }
 
     // recursive WT
+    const double t1 = ctx.time();
+    const double time_input = t1 - t0;
+
     ctx.cout_master() << "Compute WT ..." << std::endl;
     auto wt_nodes = WaveletTreeNodebased(hist,
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
@@ -232,6 +235,8 @@ int main(int argc, char** argv) {
     // Convert to level-wise representation
     WaveletTreeLevelwise wt = wt_nodes.merge(ctx, input, hist, true);
 
+    const double time_construct = ctx.time() - t1;
+
     // write to disk if needed
     if(output.length() > 0) {
         ctx.synchronize();
@@ -246,8 +251,7 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    const double dt = ctx.time() - t0;
-    Result result("mpi-parsplit", ctx, input, dt);
+    Result result("mpi-dd", ctx, input, wt.sigma(), time_input, time_construct);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;

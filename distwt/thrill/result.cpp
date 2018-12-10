@@ -26,14 +26,18 @@ Result::Result(
     thrill::Context& ctx,
     const std::string& input_filename,
     const size_t input_size,
-    const double time) {
+    const size_t alphabet,
+    const double time_input,
+    const double time_construct) {
 
     m_algo = algo;
     m_nodes = ctx.num_hosts();
     m_workers_per_node = ctx.workers_per_host();
     m_input = input_filename;
     m_size = input_size;
-    m_time = time;
+    m_alphabet = alphabet;
+    m_time_input = time_input;
+    m_time_construct = time_construct;
 
     // compute stats exactly like Thrill does it
     const size_t local_worker_id_ = ctx.local_worker_id();

@@ -6,14 +6,18 @@ Result::Result(
     const std::string& algo,
     const MPIContext& ctx,
     const FilePartitionReader& input,
-    const double time) {
+    const size_t alphabet,
+    const double time_input,
+    const double time_construct) {
 
     m_algo = algo;
     m_nodes = ctx.num_nodes();
     m_workers_per_node = ctx.num_workers_per_node();
     m_input = input.filename();
     m_size = input.total_size();
-    m_time = time;
+    m_alphabet = alphabet;
+    m_time_input = time_input;
+    m_time_construct = time_construct;
 
     // gather distributed stats
     m_memory = ctx.gather_max_alloc();

@@ -68,37 +68,7 @@ void Process(
     size_t input_size,
     std::string output) {
 
-    // load raw text
-    auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-        ctx, input, input_size).Cache();
 
-    // compute histogram
-    Histogram hist(rawtext);
-
-    // compute effective alphabet
-    EffectiveAlphabet ea(hist);
-
-    // transform text
-    auto etext = ea.transform(rawtext).Cache();
-
-    // construct node-based wt
-    WaveletTreeNodebased wt_nodes(hist,
-    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
-        bits.resize(wt.num_nodes());
-        flatWT(bits, wt, hist, etext);
-    });
-
-    // Merge to levelwise wavelet tree
-    auto wt = wt_nodes.merge(ctx, hist);
-
-    if(output.length() > 0) {
-        // store to disk
-        hist.save(output + "." + WaveletTreeBase::histogram_extension());
-        wt.save(output);
-    } else {
-        // make sure to actually compute the wavelet tree
-        wt.ensure();
-    }
 }
 
 int main(int argc, const char** argv) {
@@ -125,15 +95,48 @@ int main(int argc, const char** argv) {
         const size_t input_size = std::min(
             util::file_size(input_filename), prefix);
 
-        Process(
-            ctx,
-            input_filename,
-            input_size,
-            output_filename);
+        // load raw text
+        auto rawtext = thrill::api::ReadBinary<rawsym_t>(
+            ctx, input_filename, input_size).Cache();
+
+        // compute histogram
+        Histogram hist(rawtext);
+
+        // compute effective alphabet
+        EffectiveAlphabet ea(hist);
+
+        // transform text
+        auto etext = ea.transform(rawtext).Cache().Execute();
+
+        const double time_input = timer.SecondsDouble();
+        timer.Reset();
+
+        // construct node-based wt
+        WaveletTreeNodebased wt_nodes(hist,
+        [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+            bits.resize(wt.num_nodes());
+            flatWT(bits, wt, hist, etext);
+        });
+
+        // Merge to levelwise wavelet tree
+        auto wt = wt_nodes.merge(ctx, hist);
+
+        if(output_filename.length() > 0) {
+            // store to disk
+            hist.save(output_filename + "." +
+                WaveletTreeBase::histogram_extension());
+            wt.save(output_filename);
+        } else {
+            // make sure to actually compute the wavelet tree
+            wt.ensure();
+        }
 
         // gather stats
         timer.Stop();
-        Result result("thrill-flat-dd", ctx, input_filename, input_size, timer.SecondsDouble());
+        Result result(
+            "thrill-flat-dd", ctx, input_filename, input_size, hist.size(),
+            time_input, timer.SecondsDouble());
+
         if(ctx.my_rank() == 0) {
             LOG1 << result.readable();
             std::cout << result.sqlplot() << std::endl;

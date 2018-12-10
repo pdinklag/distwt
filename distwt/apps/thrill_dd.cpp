@@ -62,55 +62,6 @@ void recursiveWT(
     recursiveWT(bits, wt, 2ULL * node_id + 1ULL, input_r.Cache(), m+1, b);
 }
 
-void Process(
-    thrill::Context& ctx,
-    const std::string& input,
-    const size_t input_size,
-    const std::string& output) {
-
-    // load raw text
-    auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-        ctx, input, input_size).Cache();
-
-    // compute histogram
-    Histogram hist(rawtext);
-
-    // compute effective alphabet
-    EffectiveAlphabet ea(hist);
-
-    // transform text
-    auto etext = ea.transform(rawtext).Cache();
-
-    // construct wt recursively
-    WaveletTreeNodebased wt_nodes(hist,
-    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
-        const size_t num_nodes = wt.num_nodes();
-        bits.resize(num_nodes);
-
-        recursiveWT(
-            bits,
-            wt,
-            1ULL,             // start with root node
-            etext,            // start with full transformed text
-            0, num_nodes);
-                              // start with [0, (2^h)-1] interval
-                              // this is done to stay compatible with the other
-                              // algorithms -> TODO: any negative side effects?
-    });
-
-    // Merge to levelwise wavelet tree
-    auto wt = wt_nodes.merge(ctx, hist);
-
-    if(output.length() > 0) {
-        // store to disk
-        hist.save(output + "." + WaveletTreeBase::histogram_extension());
-        wt.save(output);
-    } else {
-        // make sure to actually compute the wavelet tree
-        wt.ensure();
-    }
-}
-
 int main(int argc, const char** argv) {
     // Read command-line
     tlx::CmdlineParser cp;
@@ -135,15 +86,57 @@ int main(int argc, const char** argv) {
         const size_t input_size = std::min(
             util::file_size(input_filename), prefix);
 
-        Process(
-            ctx,
-            input_filename,
-            input_size,
-            output_filename);
+        // load raw text
+        auto rawtext = thrill::api::ReadBinary<rawsym_t>(
+            ctx, input_filename, input_size).Cache();
+
+        // compute histogram
+        Histogram hist(rawtext);
+
+        // compute effective alphabet
+        EffectiveAlphabet ea(hist);
+
+        // transform text
+        auto etext = ea.transform(rawtext).Cache().Execute();
+
+        const double time_input = timer.SecondsDouble();
+        timer.Reset();
+
+        // construct wt recursively
+        WaveletTreeNodebased wt_nodes(hist,
+        [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+            const size_t num_nodes = wt.num_nodes();
+            bits.resize(num_nodes);
+
+            recursiveWT(
+                bits,
+                wt,
+                1ULL,             // start with root node
+                etext,            // start with full transformed text
+                0, num_nodes);
+                                  // start with [0, (2^h)-1] interval
+                                  // this is done to stay compatible with the other
+                                  // algorithms -> TODO: any negative side effects?
+        });
+
+        // Merge to levelwise wavelet tree
+        auto wt = wt_nodes.merge(ctx, hist);
+
+        if(output_filename.length() > 0) {
+            // store to disk
+            hist.save(output_filename + "." +
+                WaveletTreeBase::histogram_extension());
+            wt.save(output_filename);
+        } else {
+            // make sure to actually compute the wavelet tree
+            wt.ensure();
+        }
 
         // gather stats
         timer.Stop();
-        Result result("thrill-dd", ctx, input_filename, input_size, timer.SecondsDouble());
+        Result result("thrill-dd", ctx, input_filename, input_size, hist.size(),
+            time_input, timer.SecondsDouble());
+
         if(ctx.my_rank() == 0) {
             LOG1 << result.readable();
             std::cout << result.sqlplot() << std::endl;

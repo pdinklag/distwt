@@ -31,61 +31,7 @@ void Process(
     size_t input_size,
     std::string output) {
 
-    // load raw text
-    auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-        ctx, input, input_size).Cache();
 
-    // compute histogram
-    Histogram hist(rawtext);
-
-    // compute effective alphabet
-    EffectiveAlphabet ea(hist);
-
-    // transform text
-    auto etext = ea.transform(rawtext).Cache();
-
-    // construct wt
-    WaveletTreeLevelwise wt(hist,
-    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
-        const size_t height = wt.height();
-        bits.resize(height);
-
-        auto text = etext;
-        for(size_t level = 0; level < height; level++) {
-            const size_t rsh = height - 1 - level;
-
-            // compute and store BV
-            bits[level] = text.Window(thrill::api::DisjointTag, 64,
-                [rsh](size_t, const std::vector<esym_t>& v) {
-                    uint64_t bv = 0;
-                    for(size_t i = 0; i < v.size(); i++) {
-                        // check level-th bit of symbol
-                        if((v[i] >> rsh) & 1) {
-                            bv |= (1ULL << (63ULL-i));
-                        }
-                    }
-                    return bv;
-                })
-                .Cache();
-
-            if(level+1 < height) {
-                text = text.SortStable(
-                    [rsh](esym_t a, esym_t b){
-                        // stably sort according to newest bit
-                        return (a >> rsh) < (b >> rsh);
-                    }).Collapse();
-            }
-        }
-    });
-
-    if(output.length() > 0) {
-        // store to disk
-        hist.save(output + "." + WaveletTreeBase::histogram_extension());
-        wt.save(output);
-    } else {
-        // make sure to actually compute the wavelet tree
-        wt.ensure();
-    }
 }
 
 int main(int argc, const char** argv) {
@@ -112,15 +58,72 @@ int main(int argc, const char** argv) {
         const size_t input_size = std::min(
             util::file_size(input_filename), prefix);
 
-        Process(
-            ctx,
-            input_filename,
-            input_size,
-            output_filename);
+        // load raw text
+        auto rawtext = thrill::api::ReadBinary<rawsym_t>(
+            ctx, input_filename, input_size).Cache();
+
+        // compute histogram
+        Histogram hist(rawtext);
+
+        // compute effective alphabet
+        EffectiveAlphabet ea(hist);
+
+        // transform text
+        auto etext = ea.transform(rawtext).Cache().Execute();
+
+        const double time_input = timer.SecondsDouble();
+        timer.Reset();
+
+        // construct wt
+        WaveletTreeLevelwise wt(hist,
+        [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+            const size_t height = wt.height();
+            bits.resize(height);
+
+            auto text = etext;
+            for(size_t level = 0; level < height; level++) {
+                const size_t rsh = height - 1 - level;
+
+                // compute and store BV
+                bits[level] = text.Window(thrill::api::DisjointTag, 64,
+                    [rsh](size_t, const std::vector<esym_t>& v) {
+                        uint64_t bv = 0;
+                        for(size_t i = 0; i < v.size(); i++) {
+                            // check level-th bit of symbol
+                            if((v[i] >> rsh) & 1) {
+                                bv |= (1ULL << (63ULL-i));
+                            }
+                        }
+                        return bv;
+                    })
+                    .Cache();
+
+                if(level+1 < height) {
+                    text = text.SortStable(
+                        [rsh](esym_t a, esym_t b){
+                            // stably sort according to newest bit
+                            return (a >> rsh) < (b >> rsh);
+                        }).Collapse();
+                }
+            }
+        });
+
+        if(output_filename.length() > 0) {
+            // store to disk
+            hist.save(output_filename + "." +
+                WaveletTreeBase::histogram_extension());
+            wt.save(output_filename);
+        } else {
+            // make sure to actually compute the wavelet tree
+            wt.ensure();
+        }
 
         // gather stats
         timer.Stop();
-        Result result("thrill-sort", ctx, input_filename, input_size, timer.SecondsDouble());
+        Result result(
+            "thrill-sort", ctx, input_filename, input_size, hist.size(),
+            time_input, timer.SecondsDouble());
+
         if(ctx.my_rank() == 0) {
             LOG1 << result.readable();
             std::cout << result.sqlplot() << std::endl;
