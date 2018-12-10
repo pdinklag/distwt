@@ -30,6 +30,8 @@ The `mpi` binaries accept the `-l <local_file>` parameter. If given, a worker's 
 Binary | Description
 ------ | -----------
 `alloc-test` | Tests how much memory can be allocated and written on the system.
+`histogram` | Computes and prints the input's histogram.
+`process` | Processes a text file, e.g., to filter only certain characters.
 `verify-levelwise` | Verifies a levelwise WT on disk against a source file.
 
 The verifier simulates an *access* operations on all positions of the input text and compares the results to the source file, thus verifying the correctness of the wavelet tree. Note that currently, the verifier must use the same amount of workers that were used to generate the output.
