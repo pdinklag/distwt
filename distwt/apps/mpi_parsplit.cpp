@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    Result result("mpi-dd", ctx, input, wt.sigma(), time);
+    Result result("mpi-parsplit", ctx, input, wt.sigma(), time);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;
