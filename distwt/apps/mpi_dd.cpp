@@ -41,7 +41,16 @@ int main(int argc, char** argv) {
 
     // Init MPI
     MPIContext ctx(&argc, &argv);
-    const double t0 = ctx.time();
+
+    Result::Time time;
+    double t0 = ctx.time();
+
+    auto dt = [&](){
+        const double t = ctx.time();
+        const double dt = t - t0;
+        t0 = t;
+        return dt;
+    };
 
     // Determine input partition
     FilePartitionReader input(ctx, input_filename, prefix);
@@ -63,9 +72,13 @@ int main(int argc, char** argv) {
         ctx.synchronize();
     }
 
+    time.input = dt();
+
     // Compute histogram
     ctx.cout_master() << "Compute histogram ..." << std::endl;
     Histogram hist(ctx, input, rdbufsize);
+
+    time.hist = dt();
 
     // Compute effective alphabet
     EffectiveAlphabet ea(hist);
@@ -78,10 +91,9 @@ int main(int argc, char** argv) {
         ea.transform(input, [&](esym_t x){ etext[i++] = x; }, rdbufsize);
     }
 
-    // recursive WT
-    const double t1 = ctx.time();
-    const double time_input = t1 - t0;
+    time.eff = dt();
 
+    // recursive WT
     ctx.cout_master() << "Compute WT ..." << std::endl;
     auto wt_nodes = WaveletTreeNodebased(hist,
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
@@ -108,10 +120,12 @@ int main(int argc, char** argv) {
         << " nodes. Synchronizing ..." << std::endl;
     ctx.synchronize();
 
+    time.construct = dt();
+
     // Convert to level-wise representation
     WaveletTreeLevelwise wt = wt_nodes.merge(ctx, input, hist, true);
 
-    const double time_construct = ctx.time() - t1;
+    time.merge = dt();
 
     // write to disk if needed
     if(output.length() > 0) {
@@ -127,7 +141,7 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    Result result("mpi-dd", ctx, input, wt.sigma(), time_input, time_construct);
+    Result result("mpi-dd", ctx, input, wt.sigma(), time);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;

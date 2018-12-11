@@ -12,8 +12,11 @@ std::string ResultBase::sqlplot() const {
     oss << " input=" << m_input;
     oss << " size=" << m_size;
     oss << " alphabet=" << m_alphabet;
-    oss << " time_input=" << m_time_input;
-    oss << " time_construct=" << m_time_construct;
+    oss << " time_input=" << m_time.input;
+    oss << " time_hist=" << m_time.hist;
+    oss << " time_eff=" << m_time.eff;
+    oss << " time_construct=" << m_time.construct;
+    oss << " time_merge=" << m_time.merge;
     oss << " memory=" << m_memory;
     oss << " traffic=" << m_traffic;
     oss << " traffic_asym=" << m_traffic_asym;
@@ -24,7 +27,7 @@ std::string ResultBase::readable() const {
     std::ostringstream oss;
     oss << "Algorithm '" << m_algo << "' finished processing input '"
         << m_input << "' (" << tlx::format_iec_units(m_size, 3) << "B) after "
-        << m_time_construct << " seconds using " << m_nodes << " nodes ("
+        << m_time.total() << " seconds using " << m_nodes << " nodes ("
         << m_workers_per_node << " workers each) causing "
         << tlx::format_iec_units(m_traffic, 3) << "B of net traffic"
         << " (" << tlx::format_iec_units(m_traffic_asym, 3) << "B assymetry) "

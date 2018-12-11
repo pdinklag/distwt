@@ -12,6 +12,5 @@ public:
         const std::string& input_filename,
         const size_t input_size,
         const size_t alphabet,
-        const double time_input,
-        const double time_construct);
+        Time time);
 };

@@ -3,6 +3,19 @@
 #include <string>
 
 class ResultBase {
+public:
+    struct Time {
+        double input;
+        double hist;
+        double eff;
+        double construct;
+        double merge;
+
+        inline double total() const {
+            return input + hist + eff + construct + merge;
+        }
+    };
+
 protected:
     std::string m_algo;
     size_t m_nodes;
@@ -10,8 +23,7 @@ protected:
     std::string m_input;
     size_t m_size;
     size_t m_alphabet;
-    double m_time_input;
-    double m_time_construct;
+    Time   m_time;
     size_t m_memory;
     size_t m_traffic;
     size_t m_traffic_asym;

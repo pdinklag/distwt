@@ -53,6 +53,7 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
+        Result::Time time;
         thrill::common::StatsTimer timer(true);
 
         const size_t input_size = std::min(
@@ -60,10 +61,16 @@ int main(int argc, const char** argv) {
 
         // load raw text
         auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-            ctx, input_filename, input_size).Cache();
+            ctx, input_filename, input_size).Cache().Execute();
+
+        time.input = timer.SecondsDouble();
+        timer.Reset();
 
         // compute histogram
         Histogram hist(rawtext);
+
+        time.hist = timer.SecondsDouble();
+        timer.Reset();
 
         // compute effective alphabet
         EffectiveAlphabet ea(hist);
@@ -71,7 +78,7 @@ int main(int argc, const char** argv) {
         // transform text
         auto etext = ea.transform(rawtext).Cache().Execute();
 
-        const double time_input = timer.SecondsDouble();
+        time.eff = timer.SecondsDouble();
         timer.Reset();
 
         // construct wt
@@ -108,21 +115,22 @@ int main(int argc, const char** argv) {
             }
         });
 
+        wt.ensure();
+
+        time.construct = timer.SecondsDouble();
+        time.merge = 0; // no merging needed!
+
+        // store to disk if needed
         if(output_filename.length() > 0) {
-            // store to disk
             hist.save(output_filename + "." +
                 WaveletTreeBase::histogram_extension());
             wt.save(output_filename);
-        } else {
-            // make sure to actually compute the wavelet tree
-            wt.ensure();
         }
 
         // gather stats
         timer.Stop();
-        Result result(
-            "thrill-sort", ctx, input_filename, input_size, hist.size(),
-            time_input, timer.SecondsDouble());
+        Result result("thrill-sort",
+            ctx, input_filename, input_size, hist.size(), time);
 
         if(ctx.my_rank() == 0) {
             LOG1 << result.readable();

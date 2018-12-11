@@ -12,6 +12,5 @@ public:
         const MPIContext& ctx,
         const FilePartitionReader& input,
         const size_t alphabet,
-        const double time_input,
-        const double time_construct);
+        Time time);
 };

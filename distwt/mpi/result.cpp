@@ -7,8 +7,7 @@ Result::Result(
     const MPIContext& ctx,
     const FilePartitionReader& input,
     const size_t alphabet,
-    const double time_input,
-    const double time_construct) {
+    Time time) {
 
     m_algo = algo;
     m_nodes = ctx.num_nodes();
@@ -16,8 +15,7 @@ Result::Result(
     m_input = input.filename();
     m_size = input.total_size();
     m_alphabet = alphabet;
-    m_time_input = time_input;
-    m_time_construct = time_construct;
+    m_time = time;
 
     // gather distributed stats
     m_memory = ctx.gather_max_alloc();
