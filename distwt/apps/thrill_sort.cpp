@@ -61,13 +61,15 @@ int main(int argc, const char** argv) {
 
         // load raw text
         auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-            ctx, input_filename, input_size).Cache().Execute();
-
-        time.input = timer.SecondsDouble();
-        timer.Reset();
+            ctx, input_filename, input_size).Cache();
 
         // compute histogram
-        Histogram hist(rawtext);
+        Histogram hist(rawtext
+            .Callback([&](){
+                time.input = timer.SecondsDouble();
+                timer.Reset();
+            })
+            .Collapse());
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
@@ -76,10 +78,10 @@ int main(int argc, const char** argv) {
         EffectiveAlphabet ea(hist);
 
         // transform text
-        auto etext = ea.transform(rawtext).Cache().Execute();
-
-        time.eff = timer.SecondsDouble();
-        timer.Reset();
+        auto etext = ea.transform(rawtext).Callback([&](){
+            time.eff = timer.SecondsDouble();
+            timer.Reset();
+        });
 
         // construct wt
         WaveletTreeLevelwise wt(hist,

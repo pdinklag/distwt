@@ -98,13 +98,15 @@ int main(int argc, const char** argv) {
 
         // load raw text
         auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-            ctx, input_filename, input_size).Cache().Execute();
-
-        time.input = timer.SecondsDouble();
-        timer.Reset();
+            ctx, input_filename, input_size).Cache()
 
         // compute histogram
-        Histogram hist(rawtext);
+        Histogram hist(rawtext
+            .Callback([&](){
+                time.input = timer.SecondsDouble();
+                timer.Reset();
+            })
+            .Collapse());
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
@@ -113,10 +115,10 @@ int main(int argc, const char** argv) {
         EffectiveAlphabet ea(hist);
 
         // transform text
-        auto etext = ea.transform(rawtext).Cache().Execute();
-
-        time.eff = timer.SecondsDouble();
-        timer.Reset();
+        auto etext = ea.transform(rawtext).Callback([&](){
+            time.eff = timer.SecondsDouble();
+            timer.Reset();
+        });
 
         // construct node-based wt
         WaveletTreeNodebased wt_nodes(hist,
@@ -125,6 +127,7 @@ int main(int argc, const char** argv) {
             flatWT(bits, wt, hist, etext);
         });
 
+        wt_nodes.ensure(); // make sure to actually compute the wavelet tree
         time.construct = timer.SecondsDouble();
         timer.Reset();
 
@@ -135,7 +138,7 @@ int main(int argc, const char** argv) {
         time.merge = timer.SecondsDouble();
 
         // store to disk if needed
-        if(output_filename.length() > 0) {    
+        if(output_filename.length() > 0) {
             hist.save(output_filename + "." +
                 WaveletTreeBase::histogram_extension());
             wt.save(output_filename);

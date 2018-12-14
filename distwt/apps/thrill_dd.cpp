@@ -95,7 +95,6 @@ int main(int argc, const char** argv) {
         // compute histogram
         Histogram hist(rawtext
             .Callback([&](){
-                if(ctx.my_rank() == 0) LOG1 << "Input read!";
                 time.input = timer.SecondsDouble();
                 timer.Reset();
             })
@@ -110,7 +109,6 @@ int main(int argc, const char** argv) {
 
         // transform text
         auto etext = ea.transform(rawtext).Callback([&](){
-            if(ctx.my_rank() == 0) LOG1 << "Effective transformation computed!";
             time.eff = timer.SecondsDouble();
             timer.Reset();
         });
@@ -135,7 +133,6 @@ int main(int argc, const char** argv) {
         });
 
         wt_nodes.ensure(); // make sure to actually compute the wavelet tree
-
         time.construct = timer.SecondsDouble();
         timer.Reset();
 
