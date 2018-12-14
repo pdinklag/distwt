@@ -6,6 +6,7 @@
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
+#include <thrill/api/callback.hpp>
 #include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/rebalance.hpp>
@@ -89,25 +90,32 @@ int main(int argc, const char** argv) {
 
         // load raw text
         auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-            ctx, input_filename, input_size).Cache().Execute();
-
-        time.input = timer.SecondsDouble();
-        timer.Reset();
+            ctx, input_filename, input_size).Cache();
 
         // compute histogram
-        Histogram hist(rawtext);
+        Histogram hist(rawtext
+            .Callback([&](){
+                if(ctx.my_rank() == 0) LOG1 << "Input read!";
+                time.input = timer.SecondsDouble();
+                timer.Reset();
+            })
+            .Collapse());
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
+        if(ctx.my_rank() == 0) LOG1 << "Histogram computed!";
 
         // compute effective alphabet
         EffectiveAlphabet ea(hist);
 
         // transform text
-        auto etext = ea.transform(rawtext).Cache().Execute();
+        auto etext = ea.transform(rawtext).Callback([&](){
+            if(ctx.my_rank() == 0) LOG1 << "Effective transformation computed!";
+            time.eff = timer.SecondsDouble();
+            timer.Reset();
+        });
 
-        time.eff = timer.SecondsDouble();
-        timer.Reset();
+        if(ctx.my_rank() == 0) LOG1 << "Constructing WT ...";
 
         // construct wt recursively
         WaveletTreeNodebased wt_nodes(hist,
@@ -125,6 +133,8 @@ int main(int argc, const char** argv) {
                                   // this is done to stay compatible with the other
                                   // algorithms -> TODO: any negative side effects?
         });
+
+        wt_nodes.ensure(); // make sure to actually compute the wavelet tree
 
         time.construct = timer.SecondsDouble();
         timer.Reset();
