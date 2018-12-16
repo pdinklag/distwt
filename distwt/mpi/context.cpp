@@ -48,7 +48,7 @@ MPIContext::MPIContext(int* argc, char*** argv)
 
     // initial synchronization
     MPI_Barrier(MPI_COMM_WORLD);
-    m_start_time = util::time();
+    m_start_time = time();
 
     cout_master() << "MPIContext initialized with "
         << num_workers() << " workers on "
