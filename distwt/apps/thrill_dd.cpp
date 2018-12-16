@@ -6,7 +6,7 @@
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
-#include <thrill/api/callback.hpp>
+#include <distwt/thrill/callback.hpp>
 #include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/rebalance.hpp>
@@ -18,7 +18,6 @@
 
 #include <distwt/common/binary_io.hpp>
 #include <distwt/common/util.hpp>
-
 #include <distwt/thrill/text.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
@@ -93,8 +92,9 @@ int main(int argc, const char** argv) {
             ctx, input_filename, input_size).Cache();
 
         // compute histogram
-        Histogram hist(ctx, rawtext
-            .Callback([&](){
+        Histogram hist(ctx,
+            thrill::api::ext::Callback(rawtext,
+            [&](){
                 time.input = timer.SecondsDouble();
                 timer.Reset();
             })
@@ -108,7 +108,8 @@ int main(int argc, const char** argv) {
         EffectiveAlphabet ea(hist);
 
         // transform text
-        auto etext = ea.transform(rawtext).Callback([&](){
+        auto etext = thrill::api::ext::Callback(ea.transform(rawtext),
+        [&](){
             time.eff = timer.SecondsDouble();
             timer.Reset();
         });
