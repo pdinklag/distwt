@@ -6,6 +6,7 @@
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
+#include <thrill/api/callback.hpp>
 #include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/rebalance.hpp>
@@ -98,7 +99,7 @@ int main(int argc, const char** argv) {
 
         // load raw text
         auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-            ctx, input_filename, input_size).Cache()
+            ctx, input_filename, input_size).Cache();
 
         // compute histogram
         Histogram hist(rawtext

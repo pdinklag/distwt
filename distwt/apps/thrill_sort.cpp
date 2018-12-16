@@ -6,6 +6,7 @@
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
+#include <thrill/api/callback.hpp>
 #include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
