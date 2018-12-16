@@ -65,7 +65,7 @@ int main(int argc, const char** argv) {
             ctx, input_filename, input_size).Cache();
 
         // compute histogram
-        Histogram hist(rawtext
+        Histogram hist(ctx, rawtext
             .Callback([&](){
                 time.input = timer.SecondsDouble();
                 timer.Reset();
