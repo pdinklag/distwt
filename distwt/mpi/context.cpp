@@ -108,7 +108,8 @@ void MPIContext::set_comm(MPI_Comm comm) {
 std::ostream& MPIContext::cout() const {
     return (std::cout <<
         "[#" << m_rank <<
-        " @" << std::setprecision(3) << std::fixed << time() << "] ");
+        " @" << std::setprecision(3) << std::fixed
+        << (time() - m_start_time) << "] ");
 }
 
 std::ostream& MPIContext::cout(bool b) const {
