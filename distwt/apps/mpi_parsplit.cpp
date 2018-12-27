@@ -11,6 +11,7 @@
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/parallel_split.hpp>
+#include <distwt/mpi/prefix_sum.hpp>
 #include <distwt/mpi/wt_construct_sequential.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
@@ -79,7 +80,8 @@ void recursiveWT(
             text,
             [m](const esym_t& x){return (x > m);},
             z, n-z,
-            (int)node_id);
+            (int)node_id,
+            PrefixSumOneSuperstep());
 
         // create communicators for left and right groups
         MPI_Comm parent_comm = ctx.comm();
@@ -247,7 +249,8 @@ int main(int argc, char** argv) {
     time.construct = dt();
 
     // Convert to level-wise representation
-    WaveletTreeLevelwise wt = wt_nodes.merge(ctx, input, hist, true);
+    WaveletTreeLevelwise wt = wt_nodes.merge(
+        ctx, input, hist, true, PrefixSumOneSuperstep());
 
     time.merge = dt();
 
