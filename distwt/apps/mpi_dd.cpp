@@ -101,16 +101,6 @@ int main(int argc, char** argv) {
 
         bits.resize(wt.num_nodes());
         wt_pc(wt, bits, ctx, etext);
-        /*
-        std::vector<esym_t> buffer(local_num);
-        wt_navarro(
-            bits,
-            ctx,
-            1ULL, // root
-            etext.data(), local_num, // text
-            0ULL, wt.num_nodes(), // interval
-            buffer.data()); // work buffer
-        */
     });
 
     // Clean up
@@ -126,7 +116,7 @@ int main(int argc, char** argv) {
 
     // Convert to level-wise representation
     WaveletTreeLevelwise wt = wt_nodes.merge(
-        ctx, input, hist, true, PrefixSumOneSuperstep());
+        ctx, input, hist, true, PrefixSumChain());
 
     time.merge = dt();
 

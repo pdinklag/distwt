@@ -250,7 +250,7 @@ int main(int argc, char** argv) {
 
     // Convert to level-wise representation
     WaveletTreeLevelwise wt = wt_nodes.merge(
-        ctx, input, hist, true, PrefixSumOneSuperstep());
+        ctx, input, hist, true, PrefixSumChain());
 
     time.merge = dt();
 
