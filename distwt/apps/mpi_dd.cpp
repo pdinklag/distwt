@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
     // Transform text and cache in RAM
     ctx.cout_master() << "Compute effective transformation ..." << std::endl;
-    esym_t* etext = new esym_t[local_num];
+    std::vector<esym_t> etext(local_num);
     {
         size_t i = 0;
         ea.transform(input, [&](esym_t x){ etext[i++] = x; }, rdbufsize);
@@ -101,20 +101,19 @@ int main(int argc, char** argv) {
 
         bits.resize(wt.num_nodes());
 
-        esym_t* buffer = new esym_t[local_num];
+        std::vector<esym_t> buffer(local_num);
         wt_construct_nodebased_sequential(
             bits,
             ctx,
             1ULL, // root
-            etext, local_num, // text
+            etext.data(), local_num, // text
             0ULL, wt.num_nodes(), // interval
-            buffer); // work buffer
-
-        delete[] buffer;
+            buffer.data()); // work buffer
     });
 
     // Clean up
-    delete[] etext;
+    etext.clear();
+    etext.shrink_to_fit();
 
     // Synchronize
     ctx.cout_master() << "Done computing " << wt_nodes.num_nodes()
