@@ -12,9 +12,9 @@
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/bit_vector.hpp>
 #include <distwt/mpi/prefix_sum.hpp>
-#include <distwt/mpi/wt_construct_sequential.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
+#include <distwt/mpi/wt_sequential.hpp>
 
 #include <distwt/mpi/result.hpp>
 
@@ -100,15 +100,17 @@ int main(int argc, char** argv) {
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
         bits.resize(wt.num_nodes());
-
+        wt_pc(wt, bits, ctx, etext);
+        /*
         std::vector<esym_t> buffer(local_num);
-        wt_construct_nodebased_sequential(
+        wt_navarro(
             bits,
             ctx,
             1ULL, // root
             etext.data(), local_num, // text
             0ULL, wt.num_nodes(), // interval
             buffer.data()); // work buffer
+        */
     });
 
     // Clean up

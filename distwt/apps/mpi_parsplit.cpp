@@ -12,9 +12,9 @@
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/parallel_split.hpp>
 #include <distwt/mpi/prefix_sum.hpp>
-#include <distwt/mpi/wt_construct_sequential.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
+#include <distwt/mpi/wt_sequential.hpp>
 
 #include <distwt/mpi/result.hpp>
 
@@ -40,7 +40,7 @@ void recursiveWT(
         esym_t* buffer = new esym_t[text.size()];
 
         // compute sequential
-        wt_construct_nodebased_sequential(
+        wt_navarro(
             bits,
             ctx,
             node_id,
