@@ -1,9 +1,7 @@
 #pragma once
 
-#include <bitset>
+#include <distwt/common/bv64.hpp>
 #include <thrill/data/serialization_fwd.hpp>
-
-using bv64_t = std::bitset<64>;
 
 // serialization for 64-bit bit vectors
 template<typename Archive>

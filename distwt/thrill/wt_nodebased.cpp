@@ -14,7 +14,7 @@
 #include <thrill/api/zip.hpp>
 #include <thrill/api/zip_with_index.hpp>
 
-#include <distwt/thrill/bitset.hpp>
+#include <distwt/thrill/bv64.hpp>
 #include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeNodebased::WaveletTreeNodebased(
