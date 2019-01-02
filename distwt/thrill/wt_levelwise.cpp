@@ -20,7 +20,7 @@ WaveletTreeLevelwise::WaveletTreeLevelwise(
 
     m_bits.resize(height());
     for(size_t l = 0; l < height(); l++) {
-        m_bits[l] = thrill::api::ReadBinary<uint64_t>(
+        m_bits[l] = thrill::api::ReadBinary<bv64_t>(
             ctx, filename + "*." + level_extension(l));
     }
 }
@@ -50,11 +50,10 @@ rawtext_t WaveletTreeLevelwise::decode(
         const size_t lsh = height() - 1ULL - level;
 
         xtext = dia_prefix<esym_t>(m_bits[level]
-            .template FlatMap<esym_t>([lsh](const uint64_t& x, auto emit) {
+            .template FlatMap<esym_t>([lsh](const bv64_t& x, auto emit) {
                 // expand bits to 64 boolean values
                 for(size_t i = 0; i < 64; ++i) {
-                    bool b = (x & (1ULL << (63ULL - i)));
-                    emit(esym_t(b) << lsh);
+                    emit(esym_t(x[63ULL-i]) << lsh);
                 }
             }), n)
             .Zip(xtext, [lsh](esym_t c, esym_index_t x) {

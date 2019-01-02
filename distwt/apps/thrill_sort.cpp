@@ -26,15 +26,6 @@
 #include <thrill/common/stats_timer.hpp>
 #include <distwt/thrill/result.hpp>
 
-void Process(
-    thrill::Context& ctx,
-    std::string input,
-    size_t input_size,
-    std::string output) {
-
-
-}
-
 int main(int argc, const char** argv) {
     // Read command-line
     tlx::CmdlineParser cp;
@@ -99,11 +90,11 @@ int main(int argc, const char** argv) {
                 // compute and store BV
                 bits[level] = text.Window(thrill::api::DisjointTag, 64,
                     [rsh](size_t, const std::vector<esym_t>& v) {
-                        uint64_t bv = 0;
+                        bv64_t bv;
                         for(size_t i = 0; i < v.size(); i++) {
                             // check level-th bit of symbol
                             if((v[i] >> rsh) & 1) {
-                                bv |= (1ULL << (63ULL-i));
+                                bv[63ULL-i] = 1;
                             }
                         }
                         return bv;

@@ -14,7 +14,6 @@
 #include <thrill/api/zip.hpp>
 #include <thrill/api/zip_with_index.hpp>
 
-#include <distwt/thrill/bv64.hpp>
 #include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeNodebased::WaveletTreeNodebased(
@@ -27,11 +26,11 @@ WaveletTreeNodebased::WaveletTreeNodebased(
     m_bits.resize(nodes);
     for(size_t i = 0; i < nodes; i++) {
         if(m_node_sizes[i] > 0) {
-            m_bits[i] = thrill::api::ReadBinary<uint64_t>(
+            m_bits[i] = thrill::api::ReadBinary<bv64_t>(
                 ctx, filename + "*." + node_extension(i+1));
         } else {
             m_bits[i] = thrill::api::Generate(
-                ctx, 0, [](size_t){return uint64_t(0);});
+                ctx, 0, [](size_t){return bv64_t(0);});
         }
     }
 }
@@ -48,11 +47,10 @@ thrill::DIA<esym_t> WaveletTreeNodebased::read_node(
     const size_t lsh = height() - 1ULL - level;
 
     return dia_prefix<esym_t>(m_bits[node_id-1]
-        .template FlatMap<esym_t>([lsh](const uint64_t& x, auto emit) {
+        .template FlatMap<esym_t>([lsh](const bv64_t& x, auto emit) {
             // expand bits to 64 esym_t values
             for(size_t i = 0; i < 64; ++i) {
-                bool b = (x & (1ULL << (63ULL - i)));
-                emit(esym_t(b) << lsh);
+                emit(esym_t(x[63ULL-i]) << lsh);
             }
         }), m_node_sizes[node_id-1])
         .Collapse();
@@ -133,7 +131,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
             const size_t first_level_node = num_level_nodes;
 
             // index 64-bit blocks of each node
-            using indexed_block_t = std::pair<size_t, uint64_t>;
+            using indexed_block_t = std::pair<size_t, bv64_t>;
 
             std::vector<thrill::DIA<indexed_block_t>> indexed(num_level_nodes);
             std::vector<size_t> blocks(num_level_nodes);
@@ -143,7 +141,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                 const size_t node_id = first_level_node + i;
 
                 indexed[i] = m_bits[node_id-1]
-                    .ZipWithIndex([level_node_offs](uint64_t block, size_t index){
+                    .ZipWithIndex([level_node_offs](bv64_t block, size_t index){
                         return indexed_block_t(level_node_offs+index, block);
                     });
 
@@ -201,7 +199,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     for(size_t i = 0; i < bv.size(); i++) {
                         window_bits[63ULL-i] = bv[i];
                     }
-                    return uint64_t(window_bits.to_ullong());
+                    return window_bits;
                 })
                 .Rebalance(); // re-balance across nodes
         }
