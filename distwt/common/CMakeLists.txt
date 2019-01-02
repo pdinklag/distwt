@@ -4,5 +4,6 @@ add_library(distwt-common
     histogram.cpp
     result.cpp
     wt.cpp
+    wt_sequential.cpp
 )
 target_link_libraries(distwt-common ${COMMON_DEPENDENCIES})

@@ -4,6 +4,8 @@
 #include <tlx/math/integer_log2.hpp>
 
 #include <distwt/common/util.hpp>
+#include <distwt/common/wt_sequential.hpp>
+
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
 
@@ -14,7 +16,6 @@
 #include <distwt/mpi/prefix_sum.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
-#include <distwt/mpi/wt_sequential.hpp>
 
 #include <distwt/mpi/result.hpp>
 
@@ -42,7 +43,6 @@ void recursiveWT(
         // compute sequential
         wt_navarro(
             bits,
-            ctx,
             node_id,
             text.data(),
             text.size(),
