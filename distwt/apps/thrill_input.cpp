@@ -26,6 +26,9 @@ int main(int argc, const char** argv) {
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
 
+    size_t prefix = SIZE_MAX; // default to whole file
+    cp.add_bytes('p', "prefix", prefix, "Only process prefix of input file.");
+
     if (!cp.process(argc, argv)) {
         return -1;
     }
@@ -36,7 +39,7 @@ int main(int argc, const char** argv) {
 
         // load text
         auto text = thrill::api::ext::Force(
-            thrill::api::ReadBinary<uint8_t>(ctx, input_filename).Cache());
+            thrill::api::ReadBinary<uint8_t>(ctx, input_filename, prefix).Cache());
 
         const double t1 = timer.SecondsDouble();
         LOG1 << "t1=" << t1;
