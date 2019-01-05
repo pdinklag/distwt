@@ -13,7 +13,7 @@ namespace ext {
     template <typename ValueType, typename Stack>
     auto Force(DIA<ValueType, Stack>&& _this) {
         assert(_this.IsValid());
-        auto id = _this.Map([&](uint8_t c){return c;});
+        auto id = _this.Map([&](ValueType x){return x;});
         id.Size();
         return id;
     }

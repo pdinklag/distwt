@@ -6,7 +6,6 @@
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
-#include <distwt/thrill/callback.hpp>
 #include <thrill/api/collapse.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/rebalance.hpp>
@@ -15,6 +14,7 @@
 #include <thrill/api/sort.hpp>
 #include <thrill/api/window.hpp>
 #include <thrill/api/write_binary.hpp>
+#include <distwt/thrill/force.hpp>
 
 #include <distwt/common/binary_io.hpp>
 #include <distwt/common/util.hpp>
@@ -98,30 +98,29 @@ int main(int argc, const char** argv) {
             util::file_size(input_filename), prefix);
 
         // load raw text
-        auto rawtext = thrill::api::ReadBinary<rawsym_t>(
-            ctx, input_filename, input_size).Cache();
+        auto rawtext = thrill::api::ext::Force(
+            thrill::api::ReadBinary<rawsym_t>(ctx, input_filename, input_size)
+            .Cache()
+        ).Collapse();
+
+        time.input = timer.SecondsDouble();
+        timer.Reset();
 
         // compute histogram
-        Histogram hist(ctx,
-            thrill::api::ext::Callback(rawtext,
-            [&](){
-                time.input = timer.SecondsDouble();
-                timer.Reset();
-            })
-            .Collapse());
+        Histogram hist(ctx, rawtext);
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
+
+        if(ctx.my_rank() == 0) LOG1 << "Histogram computed!";
 
         // compute effective alphabet
         EffectiveAlphabet ea(hist);
 
         // transform text
-        auto etext = thrill::api::ext::Callback(ea.transform(rawtext),
-        [&](){
-            time.eff = timer.SecondsDouble();
-            timer.Reset();
-        });
+        auto etext = thrill::api::ext::Force(ea.transform(rawtext));
+        time.eff = timer.SecondsDouble();
+        timer.Reset();
 
         // construct node-based wt
         WaveletTreeNodebased wt_nodes(hist,
