@@ -43,10 +43,10 @@ void recursiveWT(
     // compute node BV
     bits[node_id - 1] = input.Window(thrill::api::DisjointTag, 64,
         [m](size_t, const std::vector<esym_t>& v) {
-            uint64_t bv = 0;
+            bv64_t bv;
             for(size_t i = 0; i < v.size(); i++) {
                 if(v[i] > m) {
-                    bv |= (1ULL << (63ULL-i));
+                    bv[63ULL-i] = 1;
                 }
             }
             return bv;

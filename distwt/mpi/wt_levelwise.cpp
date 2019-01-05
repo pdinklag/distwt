@@ -1,6 +1,6 @@
+#include <distwt/common/bv64.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
 
-#include <bitset>
 #include <iomanip>
 #include <mpi.h>
 
@@ -32,7 +32,7 @@ void WaveletTreeLevelwise::save(
         // write
         MPI_Status status;
 
-        std::bitset<64> bitbuf;
+        bv64_t bitbuf;
         size_t x = 0;
 
         const auto& bv = m_bits[level];

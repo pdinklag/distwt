@@ -1,10 +1,11 @@
-#include <bitset>
 #include <string>
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
 
 #include <distwt/common/util.hpp>
+#include <distwt/common/wt_sequential.hpp>
+
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
 
@@ -14,7 +15,6 @@
 #include <distwt/mpi/prefix_sum.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
-#include <distwt/mpi/wt_sequential.hpp>
 
 #include <distwt/mpi/result.hpp>
 
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
         bits.resize(wt.num_nodes());
-        wt_pc(wt, bits, ctx, etext);
+        wt_pc(wt, bits, etext);
     });
 
     // Clean up

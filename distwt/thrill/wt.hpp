@@ -2,6 +2,7 @@
 
 #include <distwt/common/wt.hpp>
 #include <distwt/common/histogram.hpp>
+#include <distwt/thrill/bv64.hpp>
 
 #include <functional>
 #include <thrill/api/dia.hpp>
@@ -9,7 +10,7 @@
 
 class WaveletTree : public WaveletTreeBase {
 public:
-    using bv_t = thrill::DIA<uint64_t>;
+    using bv_t = thrill::DIA<bv64_t>;
     using bits_t = std::vector<bv_t>;
 
     using ctor_t = std::function<

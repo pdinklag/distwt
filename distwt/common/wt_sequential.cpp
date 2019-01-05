@@ -1,19 +1,11 @@
 #include <cassert>
-#include <distwt/mpi/wt_sequential.hpp>
+#include <distwt/common/wt_sequential.hpp>
 
 // prefix counting
 void wt_pc(
     const WaveletTreeBase& wt,
-    WaveletTree::bits_t& bits,
-    const MPIContext& ctx,
+    wt_bits_t& bits,
     const std::vector<esym_t>& text) {
-
-    #ifdef DEBUG_PC
-    std::stringstream ss;
-    for(esym_t c : text) ss << (size_t)c;
-    std::string dbg_text = ss.str();
-    ctx.cout_master() << "dbg_text = " << dbg_text << std::endl;
-    #endif
 
     const size_t n = text.size();
     const size_t h = wt.height();
@@ -72,8 +64,7 @@ void wt_pc(
 
 // example algorithm from Navarro's book
 void wt_navarro(
-    WaveletTree::bits_t& bits,
-    const MPIContext& ctx,
+    wt_bits_t& bits,
     const size_t node_id,
     esym_t* text,
     const size_t n,
@@ -121,7 +112,6 @@ void wt_navarro(
         // recurse on left part
         wt_navarro(
             bits,
-            ctx,
             2ULL * node_id, // left child
             buffer, z,
             a, m,
@@ -130,10 +120,10 @@ void wt_navarro(
         // recurse on right part
         wt_navarro(
             bits,
-            ctx,
             2ULL * node_id + 1ULL, // right child
             buffer + z, n - z,
             m+1, b,
             text + z);
     }
 }
+
