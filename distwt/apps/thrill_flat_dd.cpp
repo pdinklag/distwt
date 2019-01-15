@@ -45,7 +45,7 @@ void flatWT(
         for(size_t i = 0; i < level_nodes; i++) {
             // for a symbol to go in this node, its bit prefix of length pref
             // has to be precisely i
-            bits[(node_id++)-1] = input
+            bits[(node_id++)-1] = input.Keep()
                 .Filter([pref, i](const esym_t& c){ return (c >> pref) == i; })
                 .Window(thrill::api::DisjointTag, 64,
                 [rsh](size_t, const std::vector<esym_t>& v) {
@@ -57,19 +57,9 @@ void flatWT(
                         }
                     }
                     return bv;
-                })
-                .Cache();
+                });
         }
     }
-}
-
-void Process(
-    thrill::Context& ctx,
-    std::string input,
-    size_t input_size,
-    std::string output) {
-
-
 }
 
 int main(int argc, const char** argv) {
@@ -91,6 +81,8 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
+        ctx.enable_consume(true);
+
         Result::Time time;
         thrill::common::StatsTimer timer(true);
 
@@ -107,7 +99,7 @@ int main(int argc, const char** argv) {
         timer.Reset();
 
         // compute histogram
-        Histogram hist(ctx, rawtext);
+        Histogram hist(ctx, rawtext.Keep());
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
@@ -129,15 +121,12 @@ int main(int argc, const char** argv) {
             flatWT(bits, wt, hist, etext);
         });
 
-        wt_nodes.ensure(); // make sure to actually compute the wavelet tree
-        time.construct = timer.SecondsDouble();
-        timer.Reset();
-
         // Merge to levelwise wavelet tree
         auto wt = wt_nodes.merge(ctx, hist);
         wt.ensure(); // make sure to actually compute the wavelet tree
 
-        time.merge = timer.SecondsDouble();
+        time.construct = timer.SecondsDouble();
+        time.merge = 0; // we don't measure this separately
 
         // store to disk if needed
         if(output_filename.length() > 0) {

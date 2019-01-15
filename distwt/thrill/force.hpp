@@ -14,7 +14,7 @@ namespace ext {
     auto Force(DIA<ValueType, Stack>&& _this) {
         assert(_this.IsValid());
         auto id = _this.Map([&](ValueType x){return x;});
-        id.Size();
+        id.Keep().Size();
         return id;
     }
 

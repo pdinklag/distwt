@@ -41,7 +41,7 @@ void recursiveWT(
     const size_t m = (a + b) / 2;
 
     // compute node BV
-    bits[node_id - 1] = input.Window(thrill::api::DisjointTag, 64,
+    bits[node_id - 1] = input.Keep().Window(thrill::api::DisjointTag, 64,
         [m](size_t, const std::vector<esym_t>& v) {
             bv64_t bv;
             for(size_t i = 0; i < v.size(); i++) {
@@ -53,7 +53,7 @@ void recursiveWT(
         });
 
     // left child
-    auto input_l = input.Filter([m](const esym_t& c){ return (c <= m); });
+    auto input_l = input.Keep().Filter([m](const esym_t& c){ return (c <= m); });
     recursiveWT(bits, wt, 2ULL * node_id, input_l.Collapse(), a, m);
 
     // right child
@@ -80,6 +80,8 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
+        ctx.enable_consume(true);
+
         Result::Time time;
         thrill::common::StatsTimer timer(true);
 
@@ -96,7 +98,7 @@ int main(int argc, const char** argv) {
         timer.Reset();
 
         // compute histogram
-        Histogram hist(ctx, rawtext);
+        Histogram hist(ctx, rawtext.Keep());
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
@@ -130,16 +132,12 @@ int main(int argc, const char** argv) {
                                   // algorithms -> TODO: any negative side effects?
         });
 
-        //wt_nodes.ensure(); // make sure to actually compute the wavelet tree
-        //time.construct = timer.SecondsDouble();
-        //timer.Reset();
-
         // Merge to levelwise wavelet tree
         auto wt = wt_nodes.merge(ctx, hist);
         wt.ensure(); // make sure to actually compute the wavelet tree
 
         time.construct = timer.SecondsDouble();
-        time.merge = 0; //timer.SecondsDouble();
+        time.merge = 0; // we don't measure this separately
 
         // store to disk if needed
         if(output_filename.length() > 0) {

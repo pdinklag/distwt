@@ -45,6 +45,8 @@ int main(int argc, const char** argv) {
 
     // launch Thrill process
     return thrill::Run([&](thrill::Context& ctx) {
+        ctx.enable_consume(true);
+
         Result::Time time;
         thrill::common::StatsTimer timer(true);
 
@@ -61,7 +63,7 @@ int main(int argc, const char** argv) {
         timer.Reset();
 
         // compute histogram
-        Histogram hist(ctx, rawtext);
+        Histogram hist(ctx, rawtext.Keep());
 
         time.hist = timer.SecondsDouble();
         timer.Reset();
@@ -87,7 +89,7 @@ int main(int argc, const char** argv) {
                 const size_t rsh = height - 1 - level;
 
                 // compute and store BV
-                bits[level] = text.Window(thrill::api::DisjointTag, 64,
+                bits[level] = text.Keep().Window(thrill::api::DisjointTag, 64,
                     [rsh](size_t, const std::vector<esym_t>& v) {
                         bv64_t bv;
                         for(size_t i = 0; i < v.size(); i++) {

@@ -123,7 +123,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
         bits.resize(height());
-        bits[0] = m_bits[0]; // simply copy root
+        bits[0] = m_bits[0].Cache();
 
         // for each level
         for(size_t level = 1; level < height(); level++) {
@@ -201,7 +201,8 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     }
                     return window_bits;
                 })
-                .Rebalance(); // re-balance across nodes
+                .Rebalance() // re-balance across nodes
+                .Cache();
         }
     });
 }
