@@ -50,16 +50,15 @@ void recursiveWT(
                 }
             }
             return bv;
-        })
-        .Cache();
+        });
 
     // left child
     auto input_l = input.Filter([m](const esym_t& c){ return (c <= m); });
-    recursiveWT(bits, wt, 2ULL * node_id, input_l.Cache(), a, m);
+    recursiveWT(bits, wt, 2ULL * node_id, input_l.Collapse(), a, m);
 
     // right child
     auto input_r = input.Filter([m](const esym_t& c){ return (c >  m); });
-    recursiveWT(bits, wt, 2ULL * node_id + 1ULL, input_r.Cache(), m+1, b);
+    recursiveWT(bits, wt, 2ULL * node_id + 1ULL, input_r.Collapse(), m+1, b);
 }
 
 int main(int argc, const char** argv) {
@@ -131,15 +130,16 @@ int main(int argc, const char** argv) {
                                   // algorithms -> TODO: any negative side effects?
         });
 
-        wt_nodes.ensure(); // make sure to actually compute the wavelet tree
-        time.construct = timer.SecondsDouble();
-        timer.Reset();
+        //wt_nodes.ensure(); // make sure to actually compute the wavelet tree
+        //time.construct = timer.SecondsDouble();
+        //timer.Reset();
 
         // Merge to levelwise wavelet tree
         auto wt = wt_nodes.merge(ctx, hist);
         wt.ensure(); // make sure to actually compute the wavelet tree
 
-        time.merge = timer.SecondsDouble();
+        time.construct = timer.SecondsDouble();
+        time.merge = 0; //timer.SecondsDouble();
 
         // store to disk if needed
         if(output_filename.length() > 0) {
