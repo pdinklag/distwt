@@ -186,6 +186,24 @@ public:
         delete[] rbuf;
     }
 
+    template<typename T>
+    inline void scan(std::vector<T>& v, MPI_Op op = MPI_SUM) {
+        std::vector<T> rbuf(v.size());
+        MPI_Scan(v.data(), rbuf.data(), v.size(), mpi_type<T>::id(), op, m_comm);
+        v = rbuf;
+
+        // TODO: estimate TX/RX !
+    }
+
+    template<typename T>
+    inline void ex_scan(std::vector<T>& v, MPI_Op op = MPI_SUM) {
+        std::vector<T> rbuf(v.size());
+        MPI_Exscan(v.data(), rbuf.data(), v.size(), mpi_type<T>::id(), op, m_comm);
+        v = rbuf;
+
+        // TODO: estimate TX/RX !
+    }
+
     void synchronize();
 };
 

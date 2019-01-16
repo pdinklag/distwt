@@ -8,7 +8,7 @@
 class PrefixSumOneSuperstep {
 public:
     // computes the prefix sum of vector v
-    // after the operation, on the j-th worker, v contains the sum of the vectors
+    // after the operation, on the j-th worker, v contains the sum
     // of nodes [0,j] (if inclusive is true) or [0,j) (if inclusive is false)
     template<typename T>
     void operator()(
@@ -51,7 +51,7 @@ class PrefixSumChain {
 public:
     // computes the prefix sum of vector v using less messages, but more
     // synchronization
-    // after the operation, on the j-th worker, v contains the sum of the vectors
+    // after the operation, on the j-th worker, v contains the sum
     // of nodes [0,j] (if inclusive is true) or [0,j) (if inclusive is false)
     template<typename T>
     void operator()(
@@ -92,3 +92,23 @@ public:
         }
     }
 };
+
+class PrefixSumMPIScan {
+public:
+    // computes the prefix sum of vector v using MPI's scan operations.
+    // after the operation, on the j-th worker, v contains the sum
+    // of nodes [0,j] (if inclusive is true) or [0,j) (if inclusive is false)
+    template<typename T>
+    void operator()(
+        MPIContext& ctx,
+        std::vector<T>& v,
+        bool inclusive = false) {
+
+        if(inclusive) {
+            ctx.scan(v);
+        } else {
+            ctx.ex_scan(v);
+        }
+    }
+};
+

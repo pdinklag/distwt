@@ -41,6 +41,7 @@ void recursiveWT(
         esym_t* buffer = new esym_t[text.size()];
 
         // compute sequential
+        // TODO: try to implement pc here!
         wt_navarro(
             bits,
             node_id,
@@ -81,7 +82,7 @@ void recursiveWT(
             [m](const esym_t& x){return (x > m);},
             z, n-z,
             (int)node_id,
-            PrefixSumOneSuperstep());
+            PrefixSumMPIScan());
 
         // create communicators for left and right groups
         MPI_Comm parent_comm = ctx.comm();
@@ -250,7 +251,7 @@ int main(int argc, char** argv) {
 
     // Convert to level-wise representation
     WaveletTreeLevelwise wt = wt_nodes.merge(
-        ctx, input, hist, true, PrefixSumChain());
+        ctx, input, hist, true, PrefixSumMPIScan());
 
     time.merge = dt();
 
@@ -268,9 +269,10 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    Result result("mpi-parsplit", ctx, input, wt.sigma(), time);
+    Result result("mpi-parsplit-psmpi", ctx, input, wt.sigma(), time);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;
     return 0;
 }
+
