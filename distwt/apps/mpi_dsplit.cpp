@@ -37,21 +37,15 @@ void recursiveWT(
         // this may happen based on the balance of 0/1 bits in a bit vector
         // simply use a sequential algorithm to compute the remaining WT
 
-        // allocate buffer
-        esym_t* buffer = new esym_t[text.size()];
-
         // compute sequential
-        // TODO: try to implement pc here!
-        wt_navarro(
+        const size_t wsubtree_height = tlx::integer_log2_ceil(b-a+1);
+        wt_pc(
             bits,
-            node_id,
-            text.data(),
-            text.size(),
-            a, b,
-            buffer);
+            text,
+            node_id,          // subtree root
+            wsubtree_height); // subtree height
 
-        // clean up and return
-        delete[] buffer;
+        // return
         return;
     }
 
