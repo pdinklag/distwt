@@ -12,7 +12,7 @@
 
 //#define DBG_PARSPLIT 1
 
-// performs a parallel split of the given data according to the predicate
+// performs a distributed split of the given data according to the predicate
 //
 // num0 and num1 are the amount of data items on which the predicate returns 0
 // or 1, respectively, and are expected to be pre-computed beforehand
@@ -23,7 +23,7 @@
 //
 // returns the worker rank at which the data was split
 template<typename T, typename predicate_f, typename prefix_sum_t>
-size_t parallel_str_split(
+size_t dsplit_str(
     MPIContext& ctx,
     std::vector<T>& data, // r/w buffer
     predicate_f predicate,

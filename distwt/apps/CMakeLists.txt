@@ -2,9 +2,9 @@
 add_executable(mpi-dd mpi_dd.cpp)
 target_link_libraries(mpi-dd ${MPI_APP_DEPENDENCIES})
 
-# MPI Parallel Split
-add_executable(mpi-parsplit mpi_parsplit.cpp)
-target_link_libraries(mpi-parsplit ${MPI_APP_DEPENDENCIES})
+# MPI Distributed Split
+add_executable(mpi-dsplit mpi_dsplit.cpp)
+target_link_libraries(mpi-dsplit ${MPI_APP_DEPENDENCIES})
 
 # Thrill Sort
 add_executable(thrill-sort thrill_sort.cpp)

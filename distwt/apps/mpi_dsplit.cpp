@@ -11,8 +11,8 @@
 
 #include <distwt/common/wt.hpp>
 #include <distwt/mpi/histogram.hpp>
+#include <distwt/mpi/dsplit.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
-#include <distwt/mpi/parallel_split.hpp>
 #include <distwt/mpi/prefix_sum.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
@@ -75,8 +75,8 @@ void recursiveWT(
     }
 
     if(a < m || m+1 < b) {
-        // perform parallel split
-        const size_t split = parallel_str_split(
+        // perform split
+        const size_t split = dsplit_str(
             ctx,
             text,
             [m](const esym_t& x){return (x > m);},
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    Result result("mpi-parsplit-psmpi", ctx, input, wt.sigma(), time);
+    Result result("mpi-dsplit-psmpi", ctx, input, wt.sigma(), time);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;
