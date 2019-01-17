@@ -201,7 +201,6 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     }
                     return window_bits;
                 })
-                .Rebalance() // re-balance across nodes
                 .Cache();
         }
     });
