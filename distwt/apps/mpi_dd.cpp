@@ -12,7 +12,6 @@
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/bit_vector.hpp>
-#include <distwt/mpi/prefix_sum.hpp>
 #include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wt_levelwise.hpp>
 
@@ -115,9 +114,7 @@ int main(int argc, char** argv) {
     time.construct = dt();
 
     // Convert to level-wise representation
-    WaveletTreeLevelwise wt = wt_nodes.merge(
-        ctx, input, hist, true, PrefixSumMPIScan());
-
+    WaveletTreeLevelwise wt = wt_nodes.merge(ctx, input, hist, true);
     time.merge = dt();
 
     // write to disk if needed
@@ -134,7 +131,7 @@ int main(int argc, char** argv) {
     ctx.synchronize();
 
     // gather stats
-    Result result("mpi-dd-pc-psmpi", ctx, input, wt.sigma(), time);
+    Result result("mpi-dd", ctx, input, wt.sigma(), time);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;

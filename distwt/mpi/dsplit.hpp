@@ -7,7 +7,6 @@
 #include <tlx/math/div_ceil.hpp>
 
 #include <distwt/mpi/context.hpp>
-#include <distwt/mpi/prefix_sum.hpp>
 #include <distwt/mpi/uint64_pack_str8.hpp>
 
 //#define DBG_PARSPLIT 1
@@ -22,15 +21,14 @@
 // according to num0 and num1
 //
 // returns the worker rank at which the data was split
-template<typename T, typename predicate_f, typename prefix_sum_t>
+template<typename T, typename predicate_f>
 size_t dsplit_str(
     MPIContext& ctx,
     std::vector<T>& data, // r/w buffer
     predicate_f predicate,
     const size_t local_num0,
     const size_t local_num1,
-    const int tag,
-    prefix_sum_t prefix_sum) {
+    const int tag) {
 
     // must have at least 2 targets
     const size_t targets = ctx.num_workers();
@@ -81,8 +79,7 @@ size_t dsplit_str(
 
     // compute local 0/1 offsets (prefix sums)
     std::vector<size_t> offs({local_num0, local_num1});
-
-    prefix_sum(ctx, offs);
+    ctx.ex_scan(offs);
 
     #ifdef DBG_PARSPLIT
     ctx.cout() << "offs[0]=" << offs[0]
