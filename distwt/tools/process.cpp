@@ -37,17 +37,17 @@ int main(int argc, const char** argv) {
 
     size_t read = 0, written = 0;
     {
-        char* wbuf = new char[bufsize];
+        std::vector<char> wbuf(bufsize);
         size_t wp = 0;
         std::ofstream out(outfile);
 
         {
-            char* rbuf = new char[bufsize];
+            std::vector<char> rbuf(bufsize);
             std::ifstream in(infile, std::ios::binary);
 
             bool in_eof = false;
             while(!in_eof) {
-                in.read((char*)rbuf, bufsize);
+                in.read(rbuf.data(), bufsize);
 
                 const size_t num = in.gcount();
                 in_eof = in.eof();
@@ -65,23 +65,19 @@ int main(int argc, const char** argv) {
                     // write
                     wbuf[wp++] = c;
                     if(wp >= bufsize) {
-                        out.write(wbuf, bufsize);
+                        out.write(wbuf.data(), bufsize);
                         wp = 0;
                         written += bufsize;
                     }
                 }
             }
-
-            delete[] rbuf;
         }
 
         // write remaining bytes
         if(wp > 0) {
-            out.write(wbuf, wp);
+            out.write(wbuf.data(), wp);
             written += wp;
         }
-
-        delete[] wbuf;
     }
 
     // status

@@ -27,12 +27,12 @@ int main(int argc, const char** argv) {
     size_t total = 0;
     std::array<size_t, N> hist{};
     {
-        char* rbuf = new char[rbufsize];
+        std::vector<char> rbuf(rbufsize);
         std::ifstream in(filename, std::ios::binary);
 
         bool eof = false;
         while(!eof) {
-            in.read(rbuf, rbufsize);
+            in.read(rbuf.data(), rbufsize);
 
             const size_t num = in.gcount();
             eof = in.eof();
@@ -42,8 +42,6 @@ int main(int argc, const char** argv) {
                 ++hist[(unsigned char)rbuf[i]];
             }
         }
-
-        delete[] rbuf;
     }
 
     // print histogram

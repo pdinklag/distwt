@@ -30,7 +30,7 @@ bool FilePartitionReader::extract_local(
         m_local_filename = filename + ".part." + std::to_string(m_rank);
 
         // init buffer
-        unsigned char *buf = new unsigned char[bufsize];
+        std::vector<unsigned char> buf(bufsize);
 
         // open global file for read and seek
         MPI_File fr;
@@ -58,17 +58,14 @@ bool FilePartitionReader::extract_local(
 
         while(left) {
             const size_t num = std::min(bufsize, left);
-            MPI_File_read(fr, buf, num, MPI_BYTE, &status);
-            MPI_File_write(fw, buf, num, MPI_BYTE, &status);
+            MPI_File_read(fr, buf.data(), num, MPI_BYTE, &status);
+            MPI_File_write(fw, buf.data(), num, MPI_BYTE, &status);
             left -= num;
         }
 
         // close files
         MPI_File_close(&fw);
         MPI_File_close(&fr);
-
-        // clean up
-        delete[] buf;
 
         m_extracted = true;
         return true;
@@ -106,14 +103,14 @@ void FilePartitionReader::process_local(
     // process
     {
         // initialize read buffer
-        unsigned char *buf = new unsigned char[bufsize];
+        std::vector<unsigned char> buf(bufsize);
         MPI_Status status;
 
         size_t left = m_local_num;
 
         while(left) {
             const size_t num = std::min(bufsize, left);
-            MPI_File_read(f, buf, num, MPI_BYTE, &status);
+            MPI_File_read(f, buf.data(), num, MPI_BYTE, &status);
 
             for(size_t i = 0; i < num; i++) {
                 func(buf[i]);
@@ -121,9 +118,6 @@ void FilePartitionReader::process_local(
 
             left -= num;
         }
-
-        // clean up
-        delete[] buf;
     }
 
     // close file

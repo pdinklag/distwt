@@ -178,12 +178,9 @@ public:
 
     template<typename T>
     inline void all_reduce(std::vector<T>& v, MPI_Op op = MPI_SUM) {
-        T* rbuf = new T[v.size()];
-        all_reduce(v.data(), rbuf, v.size(), op);
-        for(size_t i = 0; i < v.size(); i++) {
-            v[i] = rbuf[i];
-        }
-        delete[] rbuf;
+        std::vector<T> rbuf(v.size());
+        all_reduce(v.data(), rbuf.data(), v.size(), op);
+        v = rbuf;
     }
 
     template<typename T>
