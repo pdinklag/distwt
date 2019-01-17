@@ -4,7 +4,10 @@
 
 template<typename T> struct mpi_type;
 
+template<> struct mpi_type<uint32_t> {
+    static constexpr MPI_Datatype id() { return MPI_UNSIGNED; }
+};
+
 template<> struct mpi_type<uint64_t> {
     static constexpr MPI_Datatype id() { return MPI_LONG_LONG; }
 };
-
