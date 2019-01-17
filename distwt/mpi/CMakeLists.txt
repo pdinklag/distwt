@@ -6,6 +6,7 @@ add_library(distwt-mpi
     histogram.cpp
     malloc.cpp
     result.cpp
+    uint64_pack.cpp
     wt_levelwise.cpp
     wt_nodebased.cpp
 )
