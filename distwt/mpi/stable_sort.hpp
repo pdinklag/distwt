@@ -11,19 +11,21 @@
 #include <utility>
 #include <vector>
 
-//#define DBG_SORT 1
+#define DBG_SORT 1
 
 #ifdef DBG_SORT
 template<typename T>
 void print_vector(MPIContext& ctx, std::vector<T>& v, std::string name) {
     auto& out = ctx.cout();
     out << name << ": [ ";
-    for(const T& x : v) out << x << " ";
+    for(const T& x : v) out << size_t(x) << " ";
     out << "]" << std::endl;
 }
 #endif
 
 constexpr size_t SORT_MASTER = 0;
+constexpr int DISTR_TAG = 100;
+
 using sortkey_t = size_t;
 
 // find rank of greatest key <= "it"
@@ -66,6 +68,7 @@ void stable_sort(
         "key type must be sortkey_t!");
 
     const size_t p = ctx.num_workers();
+    ctx.cout_master() << "p=" << p << std::endl;
 
     // compare elements using their keys
     const auto elem_compare = [key,key_compare](const T& a, const T& b){
@@ -78,9 +81,17 @@ void stable_sort(
     };
 
     // --- 1: SAMPLING ---
+    #if DBG_SORT
+    ctx.cout() <<
+        "sample " << a << " out of " << v.size() << " ..." << std::endl;
+    #endif
+
     std::vector<T> samples(a);
     {
         // pick samples
+        assert(v.size() > 0);
+        // FIXME: what to do if host has nothing to sample?
+
         std::random_device rd;
         std::mt19937 gen(rd()); // seed using random_device
         //std::mt19937 gen(112113); // seed
@@ -101,13 +112,17 @@ void stable_sort(
     }
 
     // --- 2: SPLITTERS ---
+    #if DBG_SORT
+    ctx.cout_master() << "determine splitters ..." << std::endl;
+    #endif
+
     std::vector<sortkey_t> splitters;
     std::vector<size_t> key_count;
     size_t num_distinct_keys;
 
     if(ctx.rank() == SORT_MASTER) {
         // receive samples
-        std::vector<T> rcv_samples(a);
+        std::vector<T> rcv_samples;
         for(size_t i = 0; i < p; i++) {
             if(i != SORT_MASTER) {
                 ctx.recv(rcv_samples, a, i);
@@ -161,17 +176,20 @@ void stable_sort(
             splitters.resize(num_distinct_keys);
             key_count.resize(num_distinct_keys);
 
+            bool first = true;
             sortkey_t prev_key;
             size_t key_rank = 0;
             for(const T& x : samples) {
                 sortkey_t kx = key(x);
-                if(num_distinct_keys == 0) {
+                if(first) {
                     // first key
                     splitters[0] = kx;
                     key_count[0] = 1;
+                    first = false;
                 } else if(key_compare(prev_key, kx)) {
                     // new key
                     ++key_rank;
+                    assert(key_rank < num_distinct_keys);
                     splitters[key_rank] = kx;
                     key_count[key_rank] = 1;
                 } else {
@@ -180,6 +198,8 @@ void stable_sort(
                 }
                 prev_key = kx;
             }
+
+            assert(key_rank == num_distinct_keys-1);
 
             #ifdef DBG_SORT
             print_vector(ctx, splitters, "keys");
@@ -239,11 +259,16 @@ void stable_sort(
     // TODO: discard samples
 
     // --- 3: DISTRIBUTION ---
+    std::vector<std::vector<T>> outbox(p);
+
+    #if DBG_SORT
+    ctx.cout() << "distribute "
+        << v.size() << " items ..." << std::endl;
+    #endif
+
     const size_t m = num_distinct_keys;
     std::vector<T> send_to_self;
     {
-        std::vector<std::vector<T>> outbox(p);
-
         if(m <= p) {
             // SMALL KEY SET
 
@@ -253,8 +278,10 @@ void stable_sort(
             for(size_t k = 0; k < m; k++) {
                 // workers = r * p = (# / p*a) * p = # / a
                 const float num_workers_f = (float)key_count[k] / (float)a;
-                const size_t num_workers = size_t(std::round(num_workers_f));
-                workers[m] = num_workers;
+                const size_t num_workers = std::max(
+                    size_t(std::round(num_workers_f)), size_t(1));
+                workers[k] = num_workers;
+                assigned += num_workers;
             }
 
             // assigned may be less or higher than p
@@ -266,6 +293,7 @@ void stable_sort(
             while(assigned < p) {
                 auto it = std::min_element(workers.begin(), workers.end());
                 ++(*it);
+                assert(*it <= p);
                 ++assigned;
             }
             while(assigned > p) {
@@ -279,7 +307,7 @@ void stable_sort(
             std::map<
                 sortkey_t,
                 std::pair<size_t, size_t>,
-                key_compare_t> assignment;
+                key_compare_t> assignment(key_compare);
 
             size_t next_worker = 0;
             for(size_t k = 0; k < m; k++) {
@@ -302,7 +330,7 @@ void stable_sort(
             }
 
             // assign elements to buckets
-            const float rel_rank = (float)ctx.rank() / (float)ctx.num_workers();
+            const float rel_rank = float(ctx.rank()) / float(ctx.num_workers());
             for(const T& x : v) {
                 // key set is based on samples and it may still be that
                 // there are more keys than detected -- use lower_bound
@@ -315,18 +343,11 @@ void stable_sort(
                     range = (++last)->second;
                 }
 
-                const size_t j = std::min(p-1, size_t(
-                    range.first +
-                    std::round(rel_rank * (range.second - range.first))));
+                const size_t j = std::min(range.second, range.first + size_t(
+                    std::floor(rel_rank * float(range.second - range.first + 1))
+                ));
 
-                assert(j < p);
-
-                #ifdef DBG_SORT
-                ctx.cout()
-                    << "sending " << x << " (key: " << key(x) << ") to "
-                    << j << std::endl;
-                #endif
-
+                assert(j <= range.second);
                 outbox[j].push_back(x);
             }
         } else {
@@ -334,20 +355,34 @@ void stable_sort(
             // assign elements to buckets
             for(const T& x : v) {
                 const size_t bucket = lb_rank(splitters, key(x), key_compare);
+                assert(bucket < p);
                 outbox[bucket].push_back(x);
             }
         }
 
         // send buckets
+        #ifdef DBG_SORT
+        ctx.cout() << "send ..." << std::endl;
+        #endif
+
         send_to_self = outbox[ctx.rank()]; // "send to self"
         for(size_t i = 0; i < p; i++) {
             if(i != ctx.rank()) {
-                ctx.send(outbox[i], i); // always send -- may be zero
+                #ifdef DBG_SORT
+                ctx.cout()
+                    << "sending " << outbox[i].size() << " to "
+                    << i << std::endl;
+                #endif
+
+                ctx.isend(outbox[i], i, DISTR_TAG); // always send -- may be zero
             }
         }
     }
 
     // --- 4: RECEIVE AND SORT LOCALLY ---
+    #if DBG_SORT
+    ctx.cout_master() << "local sort ..." << std::endl;
+    #endif
     {
         // receive elems
         v.clear();
@@ -362,8 +397,13 @@ void stable_sort(
 
                 // TODO: discard send_to_self
             } else {
-                auto result = ctx.probe<T>(i);
-                ctx.recv(rbuf, result.size, i);
+                auto result = ctx.template probe<T>(i, DISTR_TAG);
+                ctx.recv(rbuf, result.size, i, DISTR_TAG);
+
+                /*#if DBG_SORT
+                ctx.cout() << "  received " << result.size
+                    << " from " << i << std::endl;
+                #endif*/
 
                 for(const T& x : rbuf) {
                     v.push_back(x);
@@ -374,4 +414,7 @@ void stable_sort(
         // sort elems
         std::stable_sort(v.begin(), v.end(), elem_compare);
     }
+
+    // synchronize (don't clean buffers before everything has been received)
+    ctx.synchronize();
 }

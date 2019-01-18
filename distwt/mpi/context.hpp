@@ -130,6 +130,11 @@ public:
     }
 
     template<typename T>
+    inline void isend(const std::vector<T>& v, size_t target, int tag = 0) {
+        isend(v.data(), v.size(), target, tag);
+    }
+
+    template<typename T>
     ProbeResult probe(size_t source = MPI_ANY_SOURCE, int tag = 0) {
         MPI_Status st;
         MPI_Probe(source, tag, m_comm, &st);
