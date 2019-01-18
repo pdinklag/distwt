@@ -224,6 +224,9 @@ size_t dsplit_str(
 
             str8_pack_t::unpack(msg+2, data, moffs - global_offset, mnum);
             num_received += mnum;
+
+            // clean message buffer
+            delete[] msg;
         }
         assert(num_received == expect);
     }
