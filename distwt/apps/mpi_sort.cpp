@@ -20,15 +20,16 @@ constexpr size_t MASTER = 0;
 
 // find rank of greatest key <= "it"
 // may go one beyond the right bound!
-template<typename key_t>
+template<typename key_t, typename key_compare_t>
 size_t lb_rank(
     const std::vector<key_t>& keys,
-    const key_t& it) {
+    const key_t& it,
+    key_compare_t key_compare) {
 
     size_t a = 0, b = keys.size()-1;
     while(a < b) {
         const size_t m = (a+b)/2;
-        if(it <= keys[m]) {
+        if(key_compare(it, keys[m])) {
             // go left
             b = m;
         } else {
@@ -37,26 +38,33 @@ size_t lb_rank(
         }
     }
 
-    if(it <= keys[a]) {
+    if(key_compare(it, keys[a])) {
         return a;
     } else {
         return a+1;
     }
 }
 
-template<typename T, typename key_extractor_t>
+template<typename T, typename key_extractor_t, typename key_compare_t>
 void stable_sort(
     MPIContext& ctx,
     std::vector<T>& v,
-    key_extractor_t key, // T -> key_t
+    key_extractor_t key,   // T -> key_t
+    key_compare_t key_compare, // (key_t, key_t) -> bool
     const size_t a // oversampling factor
 ) {
 
-    using key_t = decltype(key(std::declval<T>()));
-
     const size_t p = ctx.num_workers();
-    auto compare = [key](const T& a, const T& b) -> bool {
-        return key(a) < key(b);
+
+    // compare elements using their keys
+    const auto item_compare = [key,key_compare](const T& a, const T& b){
+        return key_compare(key(a), key(b));
+    };
+
+    // <= for keys
+    using key_t = decltype(key(std::declval<T>()));
+    const auto key_leq = [key_compare](const key_t& ka, const key_t& kb){
+        return (ka == kb) || key_compare(ka, kb);
     };
 
     // --- 1: SAMPLING ---
@@ -87,7 +95,7 @@ void stable_sort(
         for(size_t i = 0; i < p; i++) {
             if(i != MASTER) {
                 ctx.recv(rcv_samples, a, i);
-                for(T sample : rcv_samples) {
+                for(const T& sample : rcv_samples) {
                     samples.push_back(sample);
                 }
             }
@@ -95,12 +103,12 @@ void stable_sort(
         print_vector(ctx, samples, "received samples");
 
         // sort samples
-        std::sort(samples.begin(), samples.end(), compare);
+        std::sort(samples.begin(), samples.end(), item_compare);
         print_vector(ctx, samples, "sorted samples");
 
         // determine p-1 splitters (in a naive way... but good enough for now)
         for(size_t k = 0; k < p-1; k++) {
-            splitters[k] = samples[k * a + 1];
+            splitters[k] = key(samples[k * a + 1]);
         }
         print_vector(ctx, splitters, "splitters");
 
@@ -122,8 +130,8 @@ void stable_sort(
     {
         // assign elements to buckets
         std::vector<std::vector<T>> outbox(p);
-        for(T x : v) {
-            const size_t bucket = lb_rank(splitters, key(x));
+        for(const T& x : v) {
+            const size_t bucket = lb_rank(splitters, key(x), key_compare);
             outbox[bucket].push_back(x);
         }
 
@@ -146,7 +154,7 @@ void stable_sort(
         for(size_t i = 0; i < p; i++) {
             if(i == ctx.rank()) {
                 // "receive from self" - must happen in order for stable sort
-                for(T x : send_to_self) {
+                for(const T& x : send_to_self) {
                     v.push_back(x);
                 }
 
@@ -155,14 +163,14 @@ void stable_sort(
                 auto result = ctx.probe<T>(i);
                 ctx.recv(rbuf, result.size, i);
 
-                for(T x : rbuf) {
+                for(const T& x : rbuf) {
                     v.push_back(x);
                 }
             }
         }
 
         // sort elems
-        std::stable_sort(v.begin(), v.end(), compare);
+        std::stable_sort(v.begin(), v.end(), item_compare);
     }
 }
 
@@ -185,6 +193,7 @@ int main(int argc, char** argv) {
         ctx,
         v,
         [](uint32_t x) -> uint32_t{return x & 1;},
+        [](uint32_t a, uint32_t b){return a < b;},
         ctx.num_workers());
 
     ctx.synchronize();
