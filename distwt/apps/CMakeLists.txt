@@ -6,9 +6,9 @@ target_link_libraries(mpi-dd ${MPI_APP_DEPENDENCIES})
 add_executable(mpi-dsplit mpi_dsplit.cpp)
 target_link_libraries(mpi-dsplit ${MPI_APP_DEPENDENCIES})
 
-# MPI Sort
-add_executable(mpi-sort mpi_sort.cpp)
-target_link_libraries(mpi-sort ${MPI_APP_DEPENDENCIES})
+# MPI Bucket Sort
+add_executable(mpi-bsort mpi_bsort.cpp)
+target_link_libraries(mpi-bsort ${MPI_APP_DEPENDENCIES})
 
 # Thrill Sort
 add_executable(thrill-sort thrill_sort.cpp)
