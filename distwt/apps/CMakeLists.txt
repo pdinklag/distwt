@@ -14,6 +14,10 @@ target_link_libraries(mpi-bsort ${MPI_APP_DEPENDENCIES})
 add_executable(thrill-sort thrill_sort.cpp)
 target_link_libraries(thrill-sort ${THRILL_APP_DEPENDENCIES})
 
+# Thrill Bucket Sort
+add_executable(thrill-bsort thrill_bsort.cpp)
+target_link_libraries(thrill-bsort ${THRILL_APP_DEPENDENCIES})
+
 # Thrill Domain Decomposition
 add_executable(thrill-dd thrill_dd.cpp)
 target_link_libraries(thrill-dd ${THRILL_APP_DEPENDENCIES})
