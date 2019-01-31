@@ -3,6 +3,8 @@
 #include <iostream>
 #include <vector>
 
+#include <tlx/math/integer_log2.hpp>
+
 #include <mpi.h>
 
 #include <distwt/common/devnull.hpp>
@@ -44,6 +46,9 @@ private:
 
     void count_traffic_tx(size_t target, size_t bytes);
     void count_traffic_rx(size_t source, size_t bytes);
+
+    void count_traffic_tx_est(size_t target, size_t bytes);
+    void count_traffic_rx_est(size_t source, size_t bytes);
 
     void track_alloc(size_t size);
     void track_free(size_t size);
@@ -150,35 +155,45 @@ public:
         return probe<T>(MPI_ANY_SOURCE, tag);
     }
 
-    template<typename T>
-    inline void all_reduce(const T* sbuf, T* rbuf, size_t num, MPI_Op op = MPI_SUM) {
-        // allreduce
-        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, m_comm);
+private:
+    inline void simulate_allreduce_traffic(const size_t msg_size) {
+        // simulates the all reduce operation for traffic measurement
+        // based on the merge tree algorithm
+        const size_t logp = tlx::integer_log2_ceil(m_num_workers);
+        for(size_t level = 0; level < logp; level++) {
+            const size_t q = (1ULL << level);
+            const size_t q_prev = (1ULL << (level-1));
+            const size_t v = m_rank / q;
 
-        // estimate TX/RX
-        const size_t num_responsible = std::min(num, num_workers());
+            if((v % 2) == 0ULL) {
+                if(level+1 < logp) {
+                    // reduction: I send a message to my right sibling
+                    count_traffic_tx_est(m_rank + q, msg_size);
 
-        size_t my_num = 0;
-        for(size_t i = rank(); i < num; i += num_responsible) {
-            ++my_num;
+                    // broadcast: I receive a message from my right sibling
+                    count_traffic_rx_est(m_rank + q, msg_size);
+                }
+            }
+
+            if(level > 0) {
+                // reduction: I receive a message from my left sibling
+                //            of the previous level
+                count_traffic_rx_est(m_rank - q_prev, msg_size);
+
+                // broadcast: I send a message to my left sibling
+                //            of the previous level
+                count_traffic_tx_est(m_rank - q_prev, msg_size);
+            }
         }
+    }
 
-        const size_t msg_size = sizeof(int) + sizeof(T); // index and value
+public:
+    template<typename T>
+    inline void all_reduce(
+        const T* sbuf, T* rbuf, size_t num, MPI_Op op = MPI_SUM) {
 
-        // traffic for reporting own data
-        // FIXME: this is pessimistic, as it includes shared memory traffic
-        const size_t traffic_report = (num - my_num) * msg_size;
-
-        // traffic for broadcasting locally reduced data
-        const size_t traffic_bcast = (m_workers_per_node <= num_workers())
-            ? 0ULL
-            : my_num * (num_workers() - m_workers_per_node - 1) * msg_size;
-
-        // total traffic
-        const size_t traffic = traffic_report + traffic_bcast;
-
-        m_local_traffic.tx_est += traffic;
-        m_local_traffic.rx_est += traffic;
+        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, m_comm);
+        simulate_allreduce_traffic(sizeof(int) + num * sizeof(T));
     }
 
     template<typename T>
@@ -188,22 +203,59 @@ public:
         v = rbuf;
     }
 
+private:
+    inline void simulate_scan_traffic(const size_t msg_size) {
+        // simulates the scan operation for traffic measurement
+        // based on the merge tree algorithm
+        const size_t logp = tlx::integer_log2_ceil(m_num_workers);
+        for(size_t level = 0; level < logp; level++) {
+            const size_t q = (1ULL << level);
+            const size_t q_prev = (1ULL << (level-1));
+            const size_t v = m_rank / q;
+
+            if((v % 2) == 0ULL) {
+                if(level+1 < logp) {
+                    // bottom-up: I send a message to my right sibling
+                    count_traffic_tx_est(m_rank + q, msg_size);
+
+                    if(m_rank > 0) {
+                        // top-down: I receive a message from my left sibling
+                        count_traffic_tx_est(m_rank - q, msg_size);
+                    }
+                }
+            }
+
+            if(level > 0) {
+                // bottom-up: I receive a message from my left sibling
+                //            of the previous level
+                count_traffic_rx_est(m_rank - q_prev, msg_size);
+
+                if((v % 2) == 0ULL) {
+                    // top-down: I send a message to my right sibling of the
+                    //           previous level
+                    count_traffic_tx_est(m_rank + q_prev, msg_size);
+                }
+            }
+        }
+    }
+
+public:
     template<typename T>
     inline void scan(std::vector<T>& v, MPI_Op op = MPI_SUM) {
         std::vector<T> rbuf(v.size());
-        MPI_Scan(v.data(), rbuf.data(), v.size(), mpi_type<T>::id(), op, m_comm);
+        MPI_Scan(v.data(), rbuf.data(), v.size(),
+            mpi_type<T>::id(), op, m_comm);
         v = rbuf;
-
-        // TODO: estimate TX/RX !
+        simulate_scan_traffic(sizeof(int) + v.size() * sizeof(T));
     }
 
     template<typename T>
     inline void ex_scan(std::vector<T>& v, MPI_Op op = MPI_SUM) {
         std::vector<T> rbuf(v.size());
-        MPI_Exscan(v.data(), rbuf.data(), v.size(), mpi_type<T>::id(), op, m_comm);
+        MPI_Exscan(v.data(), rbuf.data(), v.size(),
+            mpi_type<T>::id(), op, m_comm);
         v = rbuf;
-
-        // TODO: estimate TX/RX !
+        simulate_scan_traffic(sizeof(int) + v.size() * sizeof(T));
     }
 
     void synchronize();

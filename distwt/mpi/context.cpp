@@ -82,6 +82,18 @@ void MPIContext::count_traffic_rx(size_t source, size_t bytes) {
     }
 }
 
+void MPIContext::count_traffic_tx_est(size_t target, size_t bytes) {
+    if(!same_node_as(target)) {
+        m_local_traffic.tx_est += bytes;
+    }
+}
+
+void MPIContext::count_traffic_rx_est(size_t source, size_t bytes) {
+    if(!same_node_as(source)) {
+        m_local_traffic.rx_est += bytes;
+    }
+}
+
 void MPIContext::track_alloc(size_t size) {
     m_alloc_current += size;
     m_alloc_max = std::max(m_alloc_max, m_alloc_current);
