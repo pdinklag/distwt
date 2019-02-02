@@ -2,6 +2,7 @@
 #include <utility>
 
 #include <tlx/cmdline_parser.hpp>
+#include <tlx/math/div_ceil.hpp>
 
 #include <thrill/api/dia.hpp>
 
@@ -23,6 +24,7 @@
 #include <distwt/thrill/text.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
+#include <distwt/thrill/esym_pack.hpp>
 #include <distwt/thrill/wt_levelwise.hpp>
 
 #include <thrill/common/stats_timer.hpp>
@@ -107,35 +109,89 @@ int main(int argc, const char** argv) {
                     .Cache();
 
                 // stable bucket sort of text
-                using indexed_sym_t = std::pair<size_t, esym_t>;
+                using indexed_pack_t = std::pair<size_t, esym_pack_word_t>;
                 if(level+1 < height) {
                     const size_t num_nlevel_nodes = 1ULL << (level+1);
                     const size_t first_nlevel_node = num_nlevel_nodes;
 
                     // create buckets
-                    std::vector<thrill::DIA<indexed_sym_t>> buckets(
+                    std::vector<thrill::DIA<indexed_pack_t>> buckets(
                         num_nlevel_nodes);
+
+                    // helper for discarding alignment bytes
+                    std::vector<size_t> blocks(num_nlevel_nodes);
 
                     size_t glob_node_offs = 0;
                     for(size_t v = 0; v < num_nlevel_nodes; v++) {
                         buckets[v] =
                         (v+1 == num_nlevel_nodes ? text : text.Keep())
                         .Filter([rsh,v](esym_t x){ return ((x >> rsh) == v); })
-                        .ZipWithIndex([glob_node_offs](esym_t x, size_t index){
-                            return indexed_sym_t(glob_node_offs+index, x);
+                        .Window(thrill::api::DisjointTag, esym_pack_size,
+                        [](size_t, const std::vector<esym_t>& v){
+                            // pack symbols into 64-bit words
+                            esym_pack_t pack;
+                            for(size_t i = 0; i < v.size(); i++) {
+                                pack.sym[i] = v[i];
+                            }
+                            return pack.packed;
+                        })
+                        .ZipWithIndex([glob_node_offs](
+                            esym_pack_word_t x, size_t index) {
+
+                            return indexed_pack_t(glob_node_offs+index, x);
                         });
 
+                        // compute alignment data structure
+                        const size_t node_id = first_nlevel_node + v;
+                        const size_t num_blocks = tlx::div_ceil(
+                            node_sizes[node_id-1], esym_pack_size);
+
+                        blocks[v] = (v > 0)
+                            ? (blocks[v-1] + num_blocks)
+                            : num_blocks;
+
+                        // advance
                         glob_node_offs += node_sizes[first_nlevel_node-1+v];
                     }
 
                     // concatenate buckets
                     text = thrill::api::Union(buckets)
                         .Sort(
-                        [](const indexed_sym_t& a, const indexed_sym_t& b){
+                        [](const indexed_pack_t& a, const indexed_pack_t& b){
                             //sort by indices
                             return a.first < b.first;
                         })
-                        .Map([](const indexed_sym_t& ix){ return ix.second; })
+                        .template FlatWindow<esym_t>(1,
+                        [first_nlevel_node,node_sizes,blocks](
+                        size_t rank,
+                        const thrill::common::RingBuffer<indexed_pack_t>& v,
+                        auto emit){
+                            // unpack symbols from 64-bit word
+                            esym_pack_t pack;
+                            pack.packed = v[0].second;
+
+                            // find node that current block belongs to
+                            size_t i = 0;
+                            while(blocks[i] <= rank) ++i;
+
+                            // determine block size (<= esym_pack_size at node borders)
+                            size_t block_size;
+                            if(rank+1 == blocks[i]) {
+                                const size_t sz_mod =
+                                    node_sizes[first_nlevel_node+i-1] % esym_pack_size;
+
+                                block_size = (sz_mod == 0ULL)
+                                    ? esym_pack_size
+                                    : sz_mod;
+                            } else {
+                                block_size = esym_pack_size;
+                            }
+
+                            // emit symbols, discard alignment bytes
+                            for(size_t k = 0; k < block_size; k++) {
+                                emit(pack.sym[k]);
+                            }
+                        })
                         .Collapse();
                 }
             }
