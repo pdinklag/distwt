@@ -35,7 +35,8 @@ size_t dsplit_str(
     assert(targets >= 2);
 
     // data must be consistent
-    assert(local_num0 + local_num1 == data.size());
+    const size_t local_num_total = local_num0 + local_num1;
+    assert(local_num_total == data.size());
 
     // reduce num to global
     std::vector<size_t> num({local_num0, local_num1});
@@ -88,14 +89,15 @@ size_t dsplit_str(
     #endif
 
     // allocate message buffer
-    std::vector<uint64_t*> msg_buf;
+    std::vector<uint64_t*> msg_headers;
+    std::vector<T> msg_buf(local_num_total);
 
     // send phase
     {
         // initialize buffers
-        std::array<std::vector<T>, 2> buf = {
-            std::vector<T>(num_per_target[0]),
-            std::vector<T>(num_per_target[1])
+        std::array<T*, 2> buf = {
+            msg_buf.data(),
+            msg_buf.data() + local_num0
         };
         std::array<size_t, 2> glob = {offs[0], offs[1]};
         std::array<size_t, 2> target = {
@@ -107,15 +109,13 @@ size_t dsplit_str(
 
         // split and send data
         auto send_interval = [&](const bool b, const size_t to){
-            const size_t size = str8_pack_t::required_bufsize(count[b])+2;
+            uint64_t* header = new uint64_t[2];
+            header[0] = glob[b];
+            header[1] = count[b];
+            msg_headers.push_back(header);
 
-            uint64_t* msg = new uint64_t[size];
-            msg[0] = glob[b];
-            msg[1] = count[b];
-            str8_pack_t::pack(buf[b], 0, msg+2, count[b]);
-            msg_buf.push_back(msg);
-
-            ctx.isend(msg, size, to, tag);
+            ctx.isend(header, 2, to, tag);
+            ctx.isend(buf[b], count[b], to, tag);
         };
 
         for(const T& item : data) {
@@ -141,6 +141,7 @@ size_t dsplit_str(
                 // advance
                 glob[b] += count[b];
                 assert(glob[b] == p[b]);
+                buf[b] += count[b];
                 count[b] = 0;
             }
         }
@@ -183,32 +184,32 @@ size_t dsplit_str(
         }
 
         // fit space
-        data.resize(expect);
-        data.shrink_to_fit();
+        data = std::vector<T>(expect);
 
         #ifdef DBG_PARSPLIT
         ctx.cout() << "b=" << int(b) << ", global_offset=" << global_offset
             << ", expect=" << expect << std::endl;
         #endif
 
+        uint64_t rheader[2];
         size_t num_received = 0;
         while(num_received < expect) {
             // probe for message (blocking)
             auto result = ctx.template probe<uint64_t>(tag);
 
             // receive message
-            #ifdef DBG_PARSPLIT
-                ctx.cout() << "recv msg of size " << result.size << " from "
-                    << result.sender << " ..." << std::endl;
-            #endif
-
+            assert(result.size == 2ULL);
+            ctx.recv(rheader, 2, result.sender, tag);
+            
+            /*
             uint64_t* msg = new uint64_t[result.size];
             ctx.recv(msg, result.size, result.sender, tag);
+            */
 
-            const size_t moffs = msg[0];
-            const size_t mnum = msg[1];
+            const size_t moffs = rheader[0];
+            const size_t mnum = rheader[1];
 
-            assert(result.size == str8_pack_t::required_bufsize(mnum) + 2);
+            //assert(result.size == str8_pack_t::required_bufsize(mnum) + 2);
 
             // receive global interval [moffs, moffs+mnum)
             #ifdef DBG_PARSPLIT
@@ -222,11 +223,14 @@ size_t dsplit_str(
             assert(moffs >= global_offset);
             assert(moffs - global_offset + mnum <= data.size());
 
-            str8_pack_t::unpack(msg+2, data, moffs - global_offset, mnum);
+            const size_t local_offs = moffs - global_offset;
+
+            //str8_pack_t::unpack(msg+2, data, moffs - global_offset, mnum);
+            ctx.recv(data.data() + local_offs, mnum, result.sender, tag);
             num_received += mnum;
 
             // clean message buffer
-            delete[] msg;
+            //delete[] msg;
         }
         assert(num_received == expect);
     }
@@ -235,8 +239,8 @@ size_t dsplit_str(
     ctx.synchronize();
 
     // clean up
-    for(uint64_t* msg : msg_buf) {
-        delete[] msg;
+    for(uint64_t* header : msg_headers) {
+        delete[] header;
     }
 
     // return splitter
