@@ -108,7 +108,11 @@ int main(int argc, char** argv) {
         ctx.synchronize();
         #endif
 
+        // TODO: we can tweak the buckets by allocating ONE array of n symbols.
+        //       and use the precomputed node sizes to find boundaries.
+        //       this saves re-allocations during the bucket construction!
         std::vector<std::vector<esym_t>> buckets;
+
         std::vector<uint64_t*> msg_headers;
         for(size_t level = 0; level < height; level++) {
             const int tag = int(level);
