@@ -9,12 +9,12 @@
 #include <thrill/api/read_binary.hpp>
 #include <thrill/api/rebalance.hpp>
 #include <thrill/api/sort.hpp>
-#include <thrill/api/union.hpp>
 #include <thrill/api/write_binary.hpp>
 #include <thrill/api/zip.hpp>
-#include <thrill/api/zip_with_index.hpp>
 
 #include <distwt/thrill/dia_prefix.hpp>
+
+#define SPLIT_WINDOW_SIZE 4
 
 WaveletTreeNodebased::WaveletTreeNodebased(
     const HistogramBase& hist,
@@ -130,65 +130,56 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
             const size_t num_level_nodes = 1ULL << level;
             const size_t first_level_node = num_level_nodes;
 
-            // index 64-bit blocks of each node
-            using indexed_block_t = std::pair<size_t, bv64_t>;
-
-            std::vector<thrill::DIA<indexed_block_t>> indexed(num_level_nodes);
+            std::vector<thrill::DIA<bv64_t>> level_nodes(num_level_nodes);
             std::vector<size_t> blocks(num_level_nodes);
 
-            size_t level_node_offs = 0;
             for(size_t i = 0; i < num_level_nodes; i++) {
                 const size_t node_id = first_level_node + i;
-
-                indexed[i] = m_bits[node_id-1]
-                    .ZipWithIndex([level_node_offs](bv64_t block, size_t index){
-                        return indexed_block_t(level_node_offs+index, block);
-                    });
+                level_nodes[i] = m_bits[node_id-1];
 
                 // compute alignment data structure
                 const size_t sz = m_node_sizes[node_id-1];
                 const size_t num_blocks = tlx::div_ceil(sz, 64ULL);
 
                 blocks[i] = (i > 0) ? (blocks[i-1] + num_blocks) : num_blocks;
-
-                // advance
-                level_node_offs += num_blocks;
             }
 
-            bits[level] =
-                thrill::api::Union(indexed) // union indexed blocks to level
-                .Sort([](const indexed_block_t& a, const indexed_block_t& b){
-                    //sort by indices
-                    return a.first < b.first;
-                })
-                .template FlatWindow<bool>(1,
+            bits[level] = thrill::api::Concat(level_nodes)
+                .template FlatWindow<bool>(
+                    thrill::api::DisjointTag,
+                    SPLIT_WINDOW_SIZE, // Thrill doesn't like windows of size 1!
                 [this,first_level_node,blocks](
                     size_t rank,
-                    const thrill::common::RingBuffer<indexed_block_t>& v,
+                    const std::vector<bv64_t>& v,
                     auto emit){
 
-                    // remove alignments
-                    // TODO: is there any way to do this not via a bool DIA?
+                    for(auto bv : v) {
+                        // remove alignments
+                        // TODO: is there any way to do this not via a bool DIA?
 
-                    // find node that current block belongs to
-                    size_t i = 0;
-                    while(blocks[i] <= rank) ++i;
+                        // find node that current block belongs to
+                        size_t i = 0;
+                        while(blocks[i] <= rank) ++i;
 
-                    // determine block size (<= 64 at node borders)
-                    size_t block_size;
-                    if(rank+1 == blocks[i]) {
-                        const size_t sz_mod64 =
-                            m_node_sizes[first_level_node+i-1] % 64ULL;
+                        // determine block size (<= 64 at node borders)
+                        size_t block_size;
+                        if(rank+1 == blocks[i]) {
+                            const size_t sz_mod64 =
+                                m_node_sizes[first_level_node+i-1] % 64ULL;
 
-                        block_size = (sz_mod64 == 0ULL) ? 64ULL : sz_mod64;
-                    } else {
-                        block_size = 64ULL;
-                    }
+                            block_size = (sz_mod64 == 0ULL) ? 64ULL : sz_mod64;
+                        } else {
+                            block_size = 64ULL;
+                        }
 
-                    // emit bits from block
-                    bv64_t block_bits(v[0].second);
-                    for(size_t k = 0; k < block_size; k++) {
-                        emit(block_bits[63ULL-k]);
+                        // emit bits from block
+                        bv64_t block_bits(bv);
+                        for(size_t k = 0; k < block_size; k++) {
+                            emit(block_bits[63ULL-k]);
+                        }
+
+                        // advance
+                        ++rank;
                     }
                 })
                 .Window(thrill::api::DisjointTag, 64,

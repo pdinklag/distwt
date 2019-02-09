@@ -8,14 +8,12 @@
 
 #include <thrill/api/cache.hpp>
 #include <thrill/api/collapse.hpp>
+#include <thrill/api/concat.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
 #include <thrill/api/read_binary.hpp>
 #include <thrill/api/size.hpp>
-#include <thrill/api/sort.hpp>
-#include <thrill/api/union.hpp>
 #include <thrill/api/window.hpp>
-#include <thrill/api/zip_with_index.hpp>
 #include <distwt/thrill/force.hpp>
 
 #include <distwt/common/binary_io.hpp>
@@ -109,90 +107,22 @@ int main(int argc, const char** argv) {
                     .Cache();
 
                 // stable bucket sort of text
-                using indexed_pack_t = std::pair<size_t, esym_pack_word_t>;
                 if(level+1 < height) {
                     const size_t num_nlevel_nodes = 1ULL << (level+1);
                     const size_t first_nlevel_node = num_nlevel_nodes;
 
                     // create buckets
-                    std::vector<thrill::DIA<indexed_pack_t>> buckets(
-                        num_nlevel_nodes);
+                    std::vector<thrill::DIA<esym_t>> buckets(num_nlevel_nodes);
 
-                    // helper for discarding alignment bytes
-                    std::vector<size_t> blocks(num_nlevel_nodes);
-
-                    size_t glob_node_offs = 0;
                     for(size_t v = 0; v < num_nlevel_nodes; v++) {
                         buckets[v] =
                         (v+1 == num_nlevel_nodes ? text : text.Keep())
                         .Filter([rsh,v](esym_t x){ return ((x >> rsh) == v); })
-                        .Window(thrill::api::DisjointTag, esym_pack_size,
-                        [](size_t, const std::vector<esym_t>& v){
-                            // pack symbols into 64-bit words
-                            esym_pack_t pack;
-                            for(size_t i = 0; i < v.size(); i++) {
-                                pack.sym[i] = v[i];
-                            }
-                            return pack.packed;
-                        })
-                        .ZipWithIndex([glob_node_offs](
-                            esym_pack_word_t x, size_t index) {
-
-                            return indexed_pack_t(glob_node_offs+index, x);
-                        });
-
-                        // compute alignment data structure
-                        const size_t node_id = first_nlevel_node + v;
-                        const size_t num_blocks = tlx::div_ceil(
-                            node_sizes[node_id-1], esym_pack_size);
-
-                        blocks[v] = (v > 0)
-                            ? (blocks[v-1] + num_blocks)
-                            : num_blocks;
-
-                        // advance
-                        glob_node_offs += node_sizes[first_nlevel_node-1+v];
+                        .Cache(); // segfault when using Collapse :-(
                     }
 
                     // concatenate buckets
-                    text = thrill::api::Union(buckets)
-                        .Sort(
-                        [](const indexed_pack_t& a, const indexed_pack_t& b){
-                            //sort by indices
-                            return a.first < b.first;
-                        })
-                        .template FlatWindow<esym_t>(1,
-                        [first_nlevel_node,node_sizes,blocks](
-                        size_t rank,
-                        const thrill::common::RingBuffer<indexed_pack_t>& v,
-                        auto emit){
-                            // unpack symbols from 64-bit word
-                            esym_pack_t pack;
-                            pack.packed = v[0].second;
-
-                            // find node that current block belongs to
-                            size_t i = 0;
-                            while(blocks[i] <= rank) ++i;
-
-                            // determine block size (<= esym_pack_size at node borders)
-                            size_t block_size;
-                            if(rank+1 == blocks[i]) {
-                                const size_t sz_mod =
-                                    node_sizes[first_nlevel_node+i-1] % esym_pack_size;
-
-                                block_size = (sz_mod == 0ULL)
-                                    ? esym_pack_size
-                                    : sz_mod;
-                            } else {
-                                block_size = esym_pack_size;
-                            }
-
-                            // emit symbols, discard alignment bytes
-                            for(size_t k = 0; k < block_size; k++) {
-                                emit(pack.sym[k]);
-                            }
-                        })
-                        .Collapse();
+                    text = thrill::api::Concat(buckets);
                 }
             }
         });
