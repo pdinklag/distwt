@@ -8,11 +8,10 @@
 #include <thrill/api/generate.hpp>
 #include <thrill/api/read_binary.hpp>
 #include <thrill/api/rebalance.hpp>
+#include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
-#include <thrill/api/union.hpp>
 #include <thrill/api/write_binary.hpp>
 #include <thrill/api/zip.hpp>
-#include <thrill/api/zip_with_index.hpp>
 
 #include <distwt/thrill/dia_prefix.hpp>
 
@@ -130,20 +129,14 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
             const size_t num_level_nodes = 1ULL << level;
             const size_t first_level_node = num_level_nodes;
 
-            // index 64-bit blocks of each node
-            using indexed_block_t = std::pair<size_t, bv64_t>;
-
-            std::vector<thrill::DIA<indexed_block_t>> indexed(num_level_nodes);
+            std::vector<thrill::DIA<bv64_t>> indexed(num_level_nodes);
             std::vector<size_t> blocks(num_level_nodes);
 
             size_t level_node_offs = 0;
             for(size_t i = 0; i < num_level_nodes; i++) {
                 const size_t node_id = first_level_node + i;
 
-                indexed[i] = m_bits[node_id-1]
-                    .ZipWithIndex([level_node_offs](bv64_t block, size_t index){
-                        return indexed_block_t(level_node_offs+index, block);
-                    });
+                indexed[i] = m_bits[node_id-1];
 
                 // compute alignment data structure
                 const size_t sz = m_node_sizes[node_id-1];
@@ -156,15 +149,11 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
             }
 
             bits[level] =
-                thrill::api::Union(indexed) // union indexed blocks to level
-                .Sort([](const indexed_block_t& a, const indexed_block_t& b){
-                    //sort by indices
-                    return a.first < b.first;
-                })
+                thrill::api::Concat(indexed)
                 .template FlatWindow<bool>(1,
                 [this,first_level_node,blocks](
                     size_t rank,
-                    const thrill::common::RingBuffer<indexed_block_t>& v,
+                    const thrill::common::RingBuffer<bv64_t>& v,
                     auto emit){
 
                     // remove alignments
@@ -186,7 +175,7 @@ WaveletTreeLevelwise WaveletTreeNodebased::merge(
                     }
 
                     // emit bits from block
-                    bv64_t block_bits(v[0].second);
+                    bv64_t block_bits(v[0]);
                     for(size_t k = 0; k < block_size; k++) {
                         emit(block_bits[63ULL-k]);
                     }

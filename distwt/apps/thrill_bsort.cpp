@@ -8,14 +8,12 @@
 
 #include <thrill/api/cache.hpp>
 #include <thrill/api/collapse.hpp>
+#include <thrill/api/concat.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
 #include <thrill/api/read_binary.hpp>
 #include <thrill/api/size.hpp>
-#include <thrill/api/sort.hpp>
-#include <thrill/api/union.hpp>
 #include <thrill/api/window.hpp>
-#include <thrill/api/zip_with_index.hpp>
 #include <distwt/thrill/force.hpp>
 
 #include <distwt/common/binary_io.hpp>
@@ -109,13 +107,12 @@ int main(int argc, const char** argv) {
                     .Cache();
 
                 // stable bucket sort of text
-                using indexed_pack_t = std::pair<size_t, esym_pack_word_t>;
                 if(level+1 < height) {
                     const size_t num_nlevel_nodes = 1ULL << (level+1);
                     const size_t first_nlevel_node = num_nlevel_nodes;
 
                     // create buckets
-                    std::vector<thrill::DIA<indexed_pack_t>> buckets(
+                    std::vector<thrill::DIA<esym_pack_word_t>> buckets(
                         num_nlevel_nodes);
 
                     // helper for discarding alignment bytes
@@ -134,11 +131,6 @@ int main(int argc, const char** argv) {
                                 pack.sym[i] = v[i];
                             }
                             return pack.packed;
-                        })
-                        .ZipWithIndex([glob_node_offs](
-                            esym_pack_word_t x, size_t index) {
-
-                            return indexed_pack_t(glob_node_offs+index, x);
                         });
 
                         // compute alignment data structure
@@ -155,20 +147,15 @@ int main(int argc, const char** argv) {
                     }
 
                     // concatenate buckets
-                    text = thrill::api::Union(buckets)
-                        .Sort(
-                        [](const indexed_pack_t& a, const indexed_pack_t& b){
-                            //sort by indices
-                            return a.first < b.first;
-                        })
+                    text = thrill::api::Concat(buckets)
                         .template FlatWindow<esym_t>(1,
                         [first_nlevel_node,node_sizes,blocks](
                         size_t rank,
-                        const thrill::common::RingBuffer<indexed_pack_t>& v,
+                        const thrill::common::RingBuffer<esym_pack_word_t>& v,
                         auto emit){
                             // unpack symbols from 64-bit word
                             esym_pack_t pack;
-                            pack.packed = v[0].second;
+                            pack.packed = v[0];
 
                             // find node that current block belongs to
                             size_t i = 0;
