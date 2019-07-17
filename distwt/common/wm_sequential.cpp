@@ -39,14 +39,12 @@ void wm_pc(
 
     // compute the rest bottom-up
     std::vector<size_t> borders(sigma/2); // allocate borders
-    borders[0] = 0;
     
     for(size_t level = h-1; level > 0; --level) {
         // allocate bit vector
         bits[level].resize(n);
         
         const size_t num_level_nodes = (1ULL << level);
-        const size_t glob_offs = (1ULL << level) - 1;
 
         // compute new histogram
         for(size_t v = 0; v < num_level_nodes; v++) {
@@ -55,15 +53,17 @@ void wm_pc(
 
         // compute new borders
         {
+            borders[0] = 0;
             uint32_t prev = 0, vrev;
             for(size_t v = 1; v < num_level_nodes; v++) {
-                vrev = bitrev(uint32_t(v), level + 1);
+                vrev = bitrev(uint32_t(v), level);
                 borders[vrev] = borders[prev] + hist[prev];
                 prev = vrev;
             }
         }
 
-        // compute level bit vectors
+        // compute level bit vector
+        auto& bv = bits[level];
         const size_t rsh  = h - 1 - (level - 1);
         const size_t test = 1ULL << (h - 1 - level);
         size_t num0 = 0;
@@ -76,7 +76,7 @@ void wm_pc(
             const bool b = c & test;
 
             if(!b) ++num0;
-            bits[level][pos] = b;
+            bv[pos] = b;
         }
         z[level] = num0;
     }

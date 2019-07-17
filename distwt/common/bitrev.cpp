@@ -25,5 +25,6 @@ uint32_t bitrev32(uint32_t v) {
 
 // custom
 uint32_t bitrev(uint32_t x, uint8_t b) {
+    if(!b) return 0;
     return bitrev32(x) >> (uint8_t(32) - b);
 }
