@@ -7,6 +7,7 @@ add_library(distwt-mpi
     malloc.cpp
     result.cpp
     uint64_pack.cpp
+    wm.cpp
     wt_levelwise.cpp
     wt_nodebased.cpp
 )

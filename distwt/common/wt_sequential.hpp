@@ -1,8 +1,7 @@
 #pragma once
 
-#include <cassert>
 #include <distwt/common/effective_alphabet.hpp>
-#include <distwt/common/wt.hpp>
+#include <distwt/common/wm.hpp>
 
 // one bit vector per node
 using wt_bits_t = std::vector<std::vector<bool>>;
