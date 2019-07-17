@@ -124,8 +124,9 @@ int main(int argc, char** argv) {
         ctx.synchronize();
         ctx.cout_master() << "Writing WM to disk ..." << std::endl;
 
-        hist.save(output + "." + WaveletTreeBase::histogram_extension());
+        hist.save(output + "." + WaveletMatrixBase::histogram_extension());
         wm.save(ctx, output);
+        wm.save_z(output +  + "." + WaveletMatrixBase::z_extension());
     }
 
     // Synchronize for exit

@@ -16,7 +16,7 @@ void WaveletMatrix::save(
             std::ostringstream ss;
             ss << output << std::setw(4) << std::setfill('0')
                 << ctx.rank() << '.'
-                << WaveletTreeBase::level_extension(level);
+                << WaveletMatrixBase::level_extension(level);
             filename = ss.str();
         }
 

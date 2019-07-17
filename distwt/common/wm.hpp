@@ -19,11 +19,13 @@ public:
         return "lv_" + std::to_string(level+1);
     }
 
-    static inline std::string node_extension(size_t node_id) {
-        return "node_" + std::to_string(node_id);
+    static inline std::string z_extension() {
+        return "z";
     }
 
     WaveletMatrixBase(const HistogramBase& hist);
+
+    void save_z(const std::string& filename) const;
 
     inline size_t z(size_t level) const {
         return m_z[level];
