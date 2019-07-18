@@ -5,9 +5,10 @@
 #include <tuple>
 #include <vector>
 
+#include <distwt/common/symbol.hpp>
+
 class HistogramBase {
 public:
-    using symbol_t = unsigned char;
     using entry_t = std::pair<symbol_t, size_t>;
 
 protected:

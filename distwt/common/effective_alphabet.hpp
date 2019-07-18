@@ -3,18 +3,18 @@
 #include <unordered_map>
 
 #include <distwt/common/histogram.hpp>
+#include <distwt/common/symbol.hpp>
 
 class EffectiveAlphabetBase {
 public:
-    // a symbol in the effective alphabet
-    using symbol_t = unsigned char;
+    using esym_t = symbol_t;
 
 protected:
-    std::unordered_map<HistogramBase::symbol_t, symbol_t> m_map;
+    std::unordered_map<symbol_t, esym_t> m_map;
 
 public:
     EffectiveAlphabetBase(const HistogramBase& hist);
     ~EffectiveAlphabetBase();
 };
 
-using esym_t  = EffectiveAlphabetBase::symbol_t;
+using esym_t = EffectiveAlphabetBase::esym_t;

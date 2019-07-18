@@ -7,7 +7,6 @@
 #include <tlx/math/div_ceil.hpp>
 
 #include <distwt/mpi/context.hpp>
-#include <distwt/mpi/uint64_pack_str8.hpp>
 
 //#define DBG_PARSPLIT 1
 
@@ -200,16 +199,9 @@ size_t dsplit_str(
             // receive message
             assert(result.size == 2ULL);
             ctx.recv(rheader, 2, result.sender, tag);
-            
-            /*
-            uint64_t* msg = new uint64_t[result.size];
-            ctx.recv(msg, result.size, result.sender, tag);
-            */
 
             const size_t moffs = rheader[0];
             const size_t mnum = rheader[1];
-
-            //assert(result.size == str8_pack_t::required_bufsize(mnum) + 2);
 
             // receive global interval [moffs, moffs+mnum)
             #ifdef DBG_PARSPLIT
@@ -225,12 +217,8 @@ size_t dsplit_str(
 
             const size_t local_offs = moffs - global_offset;
 
-            //str8_pack_t::unpack(msg+2, data, moffs - global_offset, mnum);
             ctx.recv(data.data() + local_offs, mnum, result.sender, tag);
             num_received += mnum;
-
-            // clean message buffer
-            //delete[] msg;
         }
         assert(num_received == expect);
     }

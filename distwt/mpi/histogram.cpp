@@ -4,6 +4,7 @@
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
 
+// FIXME: what to do for sigma >= 256 ??
 constexpr size_t SIGMA_MAX = 256ULL;
 
 Histogram::Histogram(
@@ -13,7 +14,7 @@ Histogram::Histogram(
 
     // compute local histogram
     size_t local_hist[SIGMA_MAX] = {0};
-    input.process_local([&](unsigned char c){
+    input.process_local([&](symbol_t c){
         ++local_hist[c];
     }, rdbufsize);
 

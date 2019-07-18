@@ -13,6 +13,7 @@ FilePartitionReader::FilePartitionReader(
       m_rank(ctx.rank()),
       m_extracted(false) {
 
+    // FIXME: divide total size, prefix, offsets etc. by number of WORDS (sizeof(symbol_t))
     m_total_size = std::min(util::file_size(m_filename), prefix);
     m_size_per_worker = tlx::div_ceil(m_total_size, size_t(ctx.num_workers()));
 
@@ -30,7 +31,7 @@ bool FilePartitionReader::extract_local(
         m_local_filename = filename + ".part." + std::to_string(m_rank);
 
         // init buffer
-        std::vector<unsigned char> buf(bufsize);
+        std::vector<symbol_t> buf(bufsize);
 
         // open global file for read and seek
         MPI_File fr;
@@ -58,8 +59,8 @@ bool FilePartitionReader::extract_local(
 
         while(left) {
             const size_t num = std::min(bufsize, left);
-            MPI_File_read(fr, buf.data(), num, MPI_BYTE, &status);
-            MPI_File_write(fw, buf.data(), num, MPI_BYTE, &status);
+            MPI_File_read(fr, buf.data(), num, mpi_type<symbol_t>::id(), &status);
+            MPI_File_write(fw, buf.data(), num, mpi_type<symbol_t>::id(), &status);
             left -= num;
         }
 
@@ -75,7 +76,7 @@ bool FilePartitionReader::extract_local(
 }
 
 void FilePartitionReader::process_local(
-    std::function<void(unsigned char)> func, size_t bufsize) const {
+    std::function<void(symbol_t)> func, size_t bufsize) const {
 
     // open stream and seek position
     MPI_File f;
@@ -103,14 +104,14 @@ void FilePartitionReader::process_local(
     // process
     {
         // initialize read buffer
-        std::vector<unsigned char> buf(bufsize);
+        std::vector<symbol_t> buf(bufsize);
         MPI_Status status;
 
         size_t left = m_local_num;
 
         while(left) {
             const size_t num = std::min(bufsize, left);
-            MPI_File_read(f, buf.data(), num, MPI_BYTE, &status);
+            MPI_File_read(f, buf.data(), num, mpi_type<symbol_t>::id(), &status);
 
             for(size_t i = 0; i < num; i++) {
                 func(buf[i]);

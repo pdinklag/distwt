@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include <distwt/common/symbol.hpp>
 #include <distwt/mpi/context.hpp>
 
 class FilePartitionReader {
@@ -32,5 +33,5 @@ public:
     bool extract_local(const std::string& local_filename, size_t bufsize);
 
     void process_local(
-        std::function<void(unsigned char)> func, size_t bufsize) const;
+        std::function<void(symbol_t)> func, size_t bufsize) const;
 };
