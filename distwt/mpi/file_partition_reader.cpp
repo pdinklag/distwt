@@ -13,8 +13,7 @@ FilePartitionReader::FilePartitionReader(
       m_rank(ctx.rank()),
       m_extracted(false) {
 
-    // FIXME: divide total size, prefix, offsets etc. by number of WORDS (sizeof(symbol_t))
-    m_total_size = std::min(util::file_size(m_filename), prefix);
+    m_total_size = std::min(util::file_size(m_filename) / sizeof(symbol_t), prefix);
     m_size_per_worker = tlx::div_ceil(m_total_size, size_t(ctx.num_workers()));
 
     m_local_offset = m_size_per_worker * size_t(ctx.rank());
@@ -42,7 +41,7 @@ bool FilePartitionReader::extract_local(
             MPI_INFO_NULL,
             &fr);
 
-        MPI_File_seek(fr, m_local_offset, MPI_SEEK_SET);
+        MPI_File_seek(fr, m_local_offset * sizeof(symbol_t), MPI_SEEK_SET);
 
         // open local file for write
         MPI_File fw;
@@ -98,7 +97,7 @@ void FilePartitionReader::process_local(
             MPI_INFO_NULL,
             &f);
 
-        MPI_File_seek(f, m_local_offset, MPI_SEEK_SET);
+        MPI_File_seek(f, m_local_offset * sizeof(symbol_t), MPI_SEEK_SET);
     }
 
     // process
