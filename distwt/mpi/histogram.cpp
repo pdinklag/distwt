@@ -1,5 +1,7 @@
 #include <unordered_map>
 
+#include <tlx/math/integer_log2.hpp>
+
 #include <distwt/mpi/histogram.hpp>
 
 #include <distwt/common/util.hpp>
@@ -16,7 +18,7 @@ void compute_histogram(
 
     // compute local histogram
     std::unordered_map<symbol_t, size_t> local_hist;
-    
+
     input.process_local([&](symbol_t c){
         auto it = local_hist.find(c);
         if(it != local_hist.end()) {
@@ -26,11 +28,48 @@ void compute_histogram(
         }
     }, rdbufsize);
 
-    // --- TODO: distribute using tree-like communication ---
-    // ...
+    // distribute using tree-like communication
+    {
+        const size_t rank = ctx.rank();
+        const size_t p = ctx.num_workers();
+        const bool last = (rank == p-1);
+        const size_t logp = tlx::integer_log2_ceil(p);
+
+        // bottom-up
+        for(size_t lv = 0; lv < logp; lv++) {
+            const size_t d = 1ULL << lv;
+            const size_t mask = d - 1;
+
+            // on the bottom level, every worker is active
+            // the last worker is always active
+            // otherwise, activity is determined by applying the level mask
+            if((lv == 0) || last || ((rank & mask) == mask)) {
+                // active - send or receive based on level rank
+                const size_t lv_rank = rank >> lv;
+                if(lv_rank & 1ULL) {
+                    // odd - receive from left neighbor
+                    const size_t ln = (lv_rank - 1) * d + mask;
+                    ctx.cout() << "on level " << lv << ": RECV from " << ln << std::endl;
+                } else {
+                    // even - send to right neighbor
+                    const size_t rn = std::min(rank + d, p-1);
+                    if(rn != rank) {
+                        ctx.cout() << "on level " << lv << ": SEND to " << rn << std::endl;
+                    } else {
+                        // would send to self - skip!
+                        ctx.cout() << "on level " << lv << ": SKIP" << std::endl;
+                    }
+                }
+            } else {
+                // idle - do nothing
+                ctx.cout() << "on level " << lv << ": IDLE" << std::endl;
+            }
+        }
+    }
 }
 
 // for 8-bit alphabets
+/*
 template<>
 void compute_histogram<unsigned char>(
     std::vector<HistogramBase::entry_t>& m_entries,
@@ -57,6 +96,7 @@ void compute_histogram<unsigned char>(
         }
     }
 }
+*/
 
 Histogram::Histogram(
     MPIContext& ctx,
