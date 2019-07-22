@@ -122,7 +122,10 @@ int main(int argc, char** argv) {
         ctx.synchronize();
         ctx.cout_master() << "Writing WT to disk ..." << std::endl;
 
-        hist.save(output + "." + WaveletTreeBase::histogram_extension());
+        if(ctx.rank() == 0) {
+            hist.save(output + "." + WaveletTreeBase::histogram_extension());
+        }
+        
         wt.save(ctx, output);
     }
 
