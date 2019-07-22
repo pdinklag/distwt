@@ -4,7 +4,7 @@
 #include <tlx/cmdline_parser.hpp>
 
 #include <distwt/common/util.hpp>
-#include <distwt/common/wm_sequential.hpp>
+#include <distwt/common/wt_sequential.hpp>
 
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
@@ -12,6 +12,8 @@
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
 #include <distwt/mpi/bit_vector.hpp>
+
+#include <distwt/mpi/wt_nodebased.hpp>
 #include <distwt/mpi/wm.hpp>
 
 #include <distwt/mpi/result.hpp>
@@ -93,14 +95,12 @@ int main(int argc, char** argv) {
     time.eff = dt();
 
     // local construction
-    ctx.cout_master() << "Compute WM ..." << std::endl;
-    auto wm = WaveletMatrix(hist,
-    [&](WaveletMatrix::bits_t& bits,
-        WaveletMatrix::z_t& z,
-        const WaveletMatrixBase& wm) {
+    ctx.cout_master() << "Compute local WTs ..." << std::endl;
+    auto wt_nodes = WaveletTreeNodebased(hist,
+    [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
-        bits.resize(wm.height());
-        wm_pc(wm, bits, z, etext);
+        bits.resize(wt.num_nodes());
+        wt_pc(wt, bits, etext);
     });
 
     // Clean up
@@ -113,11 +113,9 @@ int main(int argc, char** argv) {
 
     time.construct = dt();
 
-    /*
-    // Convert to level-wise representation
-    WaveletMatrix wm = wt_nodes.merge(ctx, input, hist, true);
+    // Merge
+    WaveletMatrix wm = wt_nodes.merge_to_matrix(ctx, input, hist, true);
     time.merge = dt();
-    */
 
     // write to disk if needed
     if(output.length() > 0) {

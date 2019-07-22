@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
     time.eff = dt();
 
     // recursive WT
-    ctx.cout_master() << "Compute WT ..." << std::endl;
+    ctx.cout_master() << "Compute local WTs ..." << std::endl;
     auto wt_nodes = WaveletTreeNodebased(hist,
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
