@@ -131,9 +131,7 @@ int main(int argc, char** argv) {
                 ctx.cout_master() << "z = " << glob_z << std::endl;
                 #endif
 
-                if(ctx.rank() == 0) {
-                    z[level] = glob_z;
-                }
+                z[level] = glob_z;
             };
 
             const size_t rsh = height - 1 - level;

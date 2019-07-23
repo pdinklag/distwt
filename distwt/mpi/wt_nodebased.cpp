@@ -26,33 +26,16 @@ WaveletMatrix WaveletTreeNodebased::merge_to_matrix(
             merge_impl(ctx, bits, wm, input, hist, discard, true);
 
             // compute Z values from histogram
-            {
-                const size_t sigma = hist.size();
-                
-                std::vector<size_t> sz(hist.size());
+            const size_t sigma = hist.size();
+            size_t mask = 1ULL << (height() - 1);
+            
+            for(size_t level = 0; level < height(); level++) {
+                size_t num0 = 0;
                 for(size_t i = 0; i < sigma; i++) {
-                    sz[i] = hist.entries[i].second;
+                    if((i & mask) == 0) num0 += hist.entries[i].second;
                 }
-
-                // bottom-up, level by level
-                for(size_t level = height() - 1; level > 0; level--) {
-                    const size_t num_level_nodes = 1ULL << level;
-                    size_t num0 = 0;
-
-                    // compute Z
-                    for(size_t i = 0; i < num_level_nodes; i++) {
-                        num0 += sz[2 * i];
-                    }
-                    z[level] = num0;
-
-                    // contract sizes
-                    for(size_t i = 0; i < num_level_nodes; i++) {
-                        sz[i] = sz[2 * i] + sz[2 * i] + 1;
-                    }
-                }
-
-                // top level
-                z[0] = sz[0];
+                z[level] = num0;
+                mask >>= 1ULL;
             }
         });
 }
