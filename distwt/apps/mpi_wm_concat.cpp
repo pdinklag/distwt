@@ -139,12 +139,14 @@ int main(int argc, char** argv) {
             const size_t rsh = height - 1 - level;
             if(level+1 == height) {
                 // this is the last level, build only the bit vector
+                size_t rank1 = 0;
                 for(size_t i = 0; i < local_num; i++) {
                     const bool b = (etext[i] >> rsh) & 1;
                     level_bits[i] = b;
-                    if(!b) ++local_z;
+                    rank1 += b;
                 }
 
+                local_z = local_num - rank1;
                 reduce_z();
             } else { // if level+1 < height
                 // while building the bit vector, also fill the buffers
@@ -153,15 +155,14 @@ int main(int argc, char** argv) {
                     const bool b = (x >> rsh) & 1;
                     
                     level_bits[i] = b;
-                    if(!b) ++local_z;
                     buffer[b].push_back(x);
                 }
-
-                // distribute buffers
+                local_z = buffer[0].size();
 
                 // reduce Z
                 reduce_z();
 
+                // distribute buffers
                 // compute buffer size prefix sums
                 std::vector<size_t> buffer_offs(2);
                 buffer_offs[0] = buffer[0].size();
