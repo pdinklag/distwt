@@ -147,15 +147,28 @@ int main(int argc, char** argv) {
                 local_z = local_num - rank1;
                 reduce_z();
             } else { // if level+1 < height
-                // while building the bit vector, also fill the buffers
+                // first build the bit vector and count bits
+                size_t rank1 = 0;
                 for(size_t i = 0; i < local_num; i++) {
                     const esym_t x = etext[i];
                     const bool b = (x >> rsh) & 1;
                     
                     level_bits[i] = b;
-                    buffer[b].push_back(x);
+                    rank1 += b;
                 }
-                local_z = buffer[0].size();
+                
+                local_z = local_num - rank1;
+
+                // allocate buffers and fill in a second scan
+                {
+                    buffer[0].reserve(local_z);
+                    buffer[1].reserve(rank1);
+                    for(size_t i = 0; i < local_num; i++) {
+                        const esym_t x = etext[i];
+                        const bool b = (x >> rsh) & 1;
+                        buffer[b].push_back(x);
+                    }
+                }
 
                 // reduce Z
                 reduce_z();
@@ -332,7 +345,9 @@ int main(int argc, char** argv) {
 
                 // clean up
                 buffer[0].clear();
+                buffer[0].shrink_to_fit();
                 buffer[1].clear();
+                buffer[1].shrink_to_fit();
                 
                 for(auto header : msg_headers) {
                     delete[] header;
