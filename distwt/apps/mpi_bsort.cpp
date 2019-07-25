@@ -133,11 +133,10 @@ int main(int argc, char** argv) {
                 // while building the bit vector, also fill the sort buckets
                 bucket_sizes.resize(num_nlevel_nodes);
 
-                // scan 1 - compute bit vector and bucket sizes
+                // scan 1 - compute bucket sizes
                 for(size_t i = 0; i < local_num; i++) {
                     const esym_t x = etext[i];
                     const size_t k = x >> rsh;
-                    level_bits[i] = bool(k & 1);
                     assert(k < num_nlevel_nodes);
                     ++bucket_sizes[k];
                 }
@@ -151,6 +150,7 @@ int main(int argc, char** argv) {
                 for(size_t i = 0; i < local_num; i++) {
                     const esym_t x = etext[i];
                     const size_t k = x >> rsh;
+                    level_bits[i] = bool(k & 1);
                     buckets[k].push_back(x);
                 }
 
@@ -352,7 +352,7 @@ int main(int argc, char** argv) {
         if(ctx.rank() == 0) {
             hist.save(output + "." + WaveletTreeBase::histogram_extension());
         }
-    
+
         wt.save(ctx, output);
     }
 
