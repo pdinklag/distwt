@@ -24,6 +24,8 @@ WaveletTreeNodebased::WaveletTreeNodebased(
     const size_t nodes = num_nodes();
 
     m_bits.resize(nodes);
+
+    m_node_sizes = WaveletTreeBase::node_sizes(hist);
     for(size_t i = 0; i < nodes; i++) {
         if(m_node_sizes[i] > 0) {
             m_bits[i] = thrill::api::ReadBinary<bv64_t>(

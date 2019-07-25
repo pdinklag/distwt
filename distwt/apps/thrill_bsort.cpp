@@ -86,7 +86,7 @@ int main(int argc, const char** argv) {
         WaveletTreeLevelwise wt(hist,
         [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
             const size_t height = wt.height();
-            const auto& node_sizes = wt.node_sizes();
+            auto node_sizes = WaveletTreeBase::node_sizes(hist);
 
             bits.resize(height);
 

@@ -44,6 +44,8 @@ private:
         bool discard,
         bool bit_reversal) {
 
+        auto node_sizes = WaveletTreeBase::node_sizes(hist);
+
         bits.resize(this->height());
         bits[0] = m_bits[0]; // simply copy root
 
@@ -141,7 +143,7 @@ private:
                     }
 
                     // advance in level
-                    level_node_offs += m_node_sizes[node_id-1];
+                    level_node_offs += node_sizes[node_id-1];
                 }
 
                 // allocate level bv

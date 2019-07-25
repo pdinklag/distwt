@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
         const size_t height = wt.height();
-        const auto& node_sizes = wt.node_sizes();
+        auto node_sizes = WaveletTreeBase::node_sizes(hist);
 
         bits.resize(height);
 

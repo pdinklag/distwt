@@ -12,6 +12,8 @@ class WaveletTreeNodebased : public WaveletTree {
 private:
     using esym_index_t = std::pair<esym_t, size_t>;
 
+    std::vector<size_t> m_node_sizes;
+
     thrill::DIA<esym_t> read_node(
         thrill::Context& ctx, size_t node_id, size_t level);
 

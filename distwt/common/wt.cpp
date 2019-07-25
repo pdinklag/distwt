@@ -1,7 +1,6 @@
 #include <distwt/common/wt.hpp>
 
 #include <algorithm>
-#include <tlx/math/integer_log2.hpp>
 
 void recursive_node_sizes(
     std::vector<size_t>& sizes,
@@ -21,12 +20,17 @@ void recursive_node_sizes(
     }
 }
 
+std::vector<size_t> WaveletTreeBase::node_sizes(const HistogramBase& hist) {
+    const size_t num_nodes = max_bintree_nodes(wt_height(hist.size()));
+    std::vector<size_t> sizes(num_nodes);
+    
+    auto c = hist.compute_C();
+    recursive_node_sizes(sizes, c, 1, 0, num_nodes);
+
+    return sizes;
+}
+
 WaveletTreeBase::WaveletTreeBase(const HistogramBase& hist)
     : m_sigma(hist.size()),
-      m_height(tlx::integer_log2_ceil(m_sigma - 1)),
-      m_node_sizes(num_nodes()) {
-
-    // compute node sizes
-    auto c = hist.compute_C();
-    recursive_node_sizes(m_node_sizes, c, 1, 0, m_node_sizes.size());
+      m_height(wt_height(hist.size())) {
 }

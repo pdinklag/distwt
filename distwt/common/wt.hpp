@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <tlx/math/integer_log2.hpp>
+
 #include <distwt/common/histogram.hpp>
 
 class WaveletTreeBase {
@@ -10,9 +12,17 @@ protected:
     size_t m_sigma;
     size_t m_height;
 
-    std::vector<size_t> m_node_sizes;
+    static inline size_t wt_height(const size_t sigma) {
+        return tlx::integer_log2_ceil(sigma - 1);
+    }
+
+    static inline size_t max_bintree_nodes(const size_t height) {
+        return (1ULL << height) - 1ULL;
+    }
 
 public:
+    static std::vector<size_t> node_sizes(const HistogramBase& hist);
+
     static inline std::string histogram_extension() {
         return "hist";
     }
@@ -29,9 +39,5 @@ public:
 
     inline size_t sigma() const { return m_sigma; }
     inline size_t height() const { return m_height; }
-    inline size_t num_nodes() const { return (1ULL << m_height) - 1ULL; }
-
-    inline const std::vector<size_t>& node_sizes() const {
-        return m_node_sizes;
-    }
+    inline size_t num_nodes() const { return max_bintree_nodes(m_height); }
 };
