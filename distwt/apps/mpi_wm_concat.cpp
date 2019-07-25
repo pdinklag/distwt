@@ -106,10 +106,12 @@ int main(int argc, char** argv) {
         ctx.synchronize();
         #endif
 
-        // allocate two buffers - 0 and 1
-        std::array<std::vector<esym_t>, 2> buffer;
+        // allocate buffer and pointers into it
+        std::vector<esym_t> buffer(local_num);
+        size_t num0;
 
-        std::vector<uint64_t*> msg_headers;
+        uint64_t msg_header1[2], msg_header2[2], rheader[2];
+        //std::vector<uint64_t*> msg_headers;
         for(size_t level = 0; level < height; level++) {
             const int tag = int(level);
             ctx.cout_master() << "level " << (level+1) << " ..." << std::endl;
@@ -117,15 +119,20 @@ int main(int argc, char** argv) {
             const size_t num_nlevel_nodes = 1ULL << (level+1);
             const size_t first_nlevel_node = num_nlevel_nodes;
 
+            if(level+1 == height) {
+                // we don't need the buffer anymore
+                buffer.clear();
+                buffer.shrink_to_fit();
+            }
+
             // construct bit vector
             auto& level_bits = bits[level];
             level_bits.resize(local_num);
 
-            size_t local_z = 0;
             size_t glob_z;
 
             auto reduce_z = [&](){
-                ctx.all_reduce(&local_z, &glob_z, 1);
+                ctx.all_reduce(&num0, &glob_z, 1);
 
                 #ifdef DBG_CONCAT
                 ctx.cout_master() << "z = " << glob_z << std::endl;
@@ -137,36 +144,45 @@ int main(int argc, char** argv) {
             const size_t rsh = height - 1 - level;
             if(level+1 == height) {
                 // this is the last level, build only the bit vector
-                size_t rank1 = 0;
+                size_t num1 = 0;
                 for(size_t i = 0; i < local_num; i++) {
                     const bool b = (etext[i] >> rsh) & 1;
                     level_bits[i] = b;
-                    rank1 += b;
+                    num1 += b;
                 }
 
-                local_z = local_num - rank1;
+                num0 = local_num - num1;
                 reduce_z();
             } else { // if level+1 < height
-                // first build the bit vector and count bits
-                size_t rank1 = 0;
+
+                // construct the bit vector and fill buffer
+                // we fill the 0-buffer from left to right using num0
+                // and the 1-buffer from right to left using p1
+                num0 = 0;
+                size_t p1 = local_num - 1;
+
                 for(size_t i = 0; i < local_num; i++) {
                     const esym_t x = etext[i];
                     const bool b = (x >> rsh) & 1;
-                    
-                    level_bits[i] = b;
-                    rank1 += b;
-                }
-                
-                local_z = local_num - rank1;
 
-                // allocate buffers and fill in a second scan
+                    level_bits[i] = b;
+                    if(b) {
+                        buffer[p1--] = x;
+                    } else {
+                        buffer[num0++] = x;
+                    }
+                }
+
+                assert(num0 == p1+1); // buffer must be full
+                const size_t num1 = local_num - num0;
+
+                // reverse 1-buffer in-place
                 {
-                    buffer[0].reserve(local_z);
-                    buffer[1].reserve(rank1);
-                    for(size_t i = 0; i < local_num; i++) {
-                        const esym_t x = etext[i];
-                        const bool b = (x >> rsh) & 1;
-                        buffer[b].push_back(x);
+                    size_t i = p1+1;
+                    size_t j = local_num - 1;
+
+                    while(j > i) {
+                        std::swap(buffer[i++], buffer[j--]);
                     }
                 }
 
@@ -174,16 +190,19 @@ int main(int argc, char** argv) {
                 reduce_z();
 
                 // distribute buffers
+                std::array<size_t, 2> buffer_size = { num0, num1 };
+                std::array<const esym_t*, 2> buffer_ptr = { buffer.data(), buffer.data() + num0 };
+
                 // compute buffer size prefix sums
                 std::vector<size_t> buffer_offs(2);
-                buffer_offs[0] = buffer[0].size();
-                buffer_offs[1] = buffer[1].size();
+                buffer_offs[0] = num0;
+                buffer_offs[1] = num1;
                 ctx.ex_scan(buffer_offs);
 
                 // send buffers away
                 size_t glob_offs = 0;
                 for(size_t b = 0; b <= 1; b++) {
-                  if(buffer[b].size() > 0) {
+                  if(buffer_size[b] > 0) {
 
                     const size_t glob_buffer_offs = glob_offs + buffer_offs[b];
 
@@ -201,7 +220,7 @@ int main(int argc, char** argv) {
 
                     // target of last buffer item
                     const size_t glob_last =
-                        glob_buffer_offs + buffer[b].size() - 1;
+                        glob_buffer_offs + buffer_size[b] - 1;
                     const size_t target2 =
                         glob_last / input.size_per_worker();
 
@@ -218,17 +237,15 @@ int main(int argc, char** argv) {
                         const size_t target = target1;
 
                         // send one message
-                        auto header = new uint64_t[2];
-                        header[0] = glob_buffer_offs;
-                        header[1] = buffer[b].size();
-                        msg_headers.push_back(header);
+                        msg_header1[0] = glob_buffer_offs;
+                        msg_header1[1] = buffer_size[b];
 
-                        ctx.isend(header, 2, target, tag);
-                        ctx.isend(buffer[b], target, tag);
+                        ctx.isend(msg_header1, 2, target, tag);
+                        ctx.isend(buffer_ptr[b], buffer_size[b], target, tag);
 
                         #ifdef DBG_CONCAT
                         ctx.cout()
-                            << "(single) send " << buffer[b].size() << " at "
+                            << "(single) send " << buffer_size[b] << " at "
                             << glob_buffer_offs << " (local 0)"
                             << " to " << target
                             << std::endl;
@@ -247,10 +264,8 @@ int main(int argc, char** argv) {
 
                         // message to first
                         {
-                            auto header1 = new uint64_t[2];
-                            header1[0] = glob_buffer_offs;
-                            header1[1] = size1;
-                            msg_headers.push_back(header1);
+                            msg_header1[0] = glob_buffer_offs;
+                            msg_header1[1] = size1;
 
                             #ifdef DBG_CONCAT
                             ctx.cout()
@@ -260,20 +275,18 @@ int main(int argc, char** argv) {
                                 << std::endl;
                             #endif
 
-                            ctx.isend(header1, 2, target1, tag);
-                            ctx.isend(buffer[b].data(), size1, target1, tag);
+                            ctx.isend(msg_header1, 2, target1, tag);
+                            ctx.isend(buffer_ptr[b], size1, target1, tag);
                         }
 
                         // message to second
                         {
-                            auto header2 = new uint64_t[2];
-                            header2[0] = glob_first2;
-                            header2[1] = size2;
-                            msg_headers.push_back(header2);
+                            msg_header2[0] = glob_first2;
+                            msg_header2[1] = size2;
 
-                            ctx.isend(header2, 2, target2, tag);
+                            ctx.isend(msg_header2, 2, target2, tag);
                             ctx.isend(
-                                buffer[b].data() + size1, size2, target2, tag);
+                                buffer_ptr[b] + size1, size2, target2, tag);
 
                             #ifdef DBG_CONCAT
                             ctx.cout()
@@ -303,7 +316,6 @@ int main(int argc, char** argv) {
                         auto result = ctx.template probe<uint64_t>(tag);
 
                         // receive header (global interval)
-                        uint64_t* rheader = new uint64_t[result.size];
                         ctx.recv(rheader, result.size, result.sender, tag);
 
                         const size_t glob_offs = rheader[0];
@@ -333,26 +345,12 @@ int main(int argc, char** argv) {
                             << "got " << num_received << " of " << expect
                             << std::endl;
                         #endif
-
-                        // clean message buffer
-                        delete[] rheader;
                     }
                     assert(num_received == expect);
                 }
 
-                // synchronize before cleaning!
+                // synchronize after each level
                 ctx.synchronize();
-
-                // clean up
-                buffer[0].clear();
-                buffer[0].shrink_to_fit();
-                buffer[1].clear();
-                buffer[1].shrink_to_fit();
-                
-                for(auto header : msg_headers) {
-                    delete[] header;
-                }
-                msg_headers.clear();
             }
         }
     });
@@ -369,7 +367,7 @@ int main(int argc, char** argv) {
             hist.save(output + "." + WaveletMatrixBase::histogram_extension());
             wm.save_z(output + "." + WaveletMatrixBase::z_extension());
         }
-        
+
         wm.save(ctx, output);
     }
 
