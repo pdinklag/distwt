@@ -108,10 +108,8 @@ int main(int argc, char** argv) {
         ctx.synchronize();
         #endif
 
-        // TODO: we can tweak the buckets by allocating ONE array of n symbols.
-        //       and use the precomputed node sizes to find boundaries.
-        //       this saves re-allocations during the bucket construction!
         std::vector<std::vector<esym_t>> buckets;
+        std::vector<size_t> bucket_sizes;
 
         std::vector<uint64_t*> msg_headers;
         for(size_t level = 0; level < height; level++) {
@@ -133,13 +131,26 @@ int main(int argc, char** argv) {
                 }
             } else { // if level+1 < height
                 // while building the bit vector, also fill the sort buckets
-                buckets.resize(num_nlevel_nodes);
+                bucket_sizes.resize(num_nlevel_nodes);
 
+                // scan 1 - compute bit vector and bucket sizes
                 for(size_t i = 0; i < local_num; i++) {
                     const esym_t x = etext[i];
                     const size_t k = x >> rsh;
                     level_bits[i] = bool(k & 1);
                     assert(k < num_nlevel_nodes);
+                    ++bucket_sizes[k];
+                }
+
+                // scan 2 - fill buckets
+                buckets.resize(num_nlevel_nodes);
+                for(size_t k = 0; k < num_nlevel_nodes; k++) {
+                    buckets[k].reserve(bucket_sizes[k]);
+                }
+
+                for(size_t i = 0; i < local_num; i++) {
+                    const esym_t x = etext[i];
+                    const size_t k = x >> rsh;
                     buckets[k].push_back(x);
                 }
 
@@ -320,6 +331,8 @@ int main(int argc, char** argv) {
 
                 // clean up
                 buckets.clear();
+                bucket_sizes.clear();
+
                 for(auto header : msg_headers) {
                     delete[] header;
                 }
