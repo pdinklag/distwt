@@ -92,7 +92,7 @@ private:
                             // even - send to right neighbor
                             const size_t rn = std::min(rank + d, p-1);
                             if(rn != rank) {
-                                extract(local_hist, buf_syms, buf_occs);
+                                extract_map(local_hist, buf_syms, buf_occs);
                                 ctx.send(buf_syms, rn);
                                 ctx.send(buf_occs, rn);
                             } else {
@@ -120,7 +120,7 @@ private:
                             // odd - send to left neighbor
                             const size_t ln = (lv_rank - 1) * d + mask;
 
-                            extract(local_hist, buf_syms, buf_occs);
+                            extract_map(local_hist, buf_syms, buf_occs);
                             ctx.send(buf_syms, ln);
                             ctx.send(buf_occs, ln);
                         } else {

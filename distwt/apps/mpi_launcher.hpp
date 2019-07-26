@@ -20,6 +20,9 @@ int mpi_launch(int argc, char** argv) {
     size_t prefix = SIZE_MAX; // default to whole file
     cp.add_bytes('p', "prefix", prefix, "Only process prefix of input file.");
 
+    size_t sym_width = 1;
+    cp.add_bytes('w', "width", sym_width, "Number of bytes per input symbol.");
+
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
     if (!cp.process(argc, argv)) {
@@ -30,8 +33,26 @@ int mpi_launch(int argc, char** argv) {
     MPIContext ctx(&argc, &argv);
 
     // start
-    mpi_app_t::template start<uint8_t>(
-        ctx, input_filename, prefix, rdbufsize, local_filename, output);
+    switch(sym_width) {
+        case 1:
+            mpi_app_t::template start<uint8_t>(
+                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+            return 0;
 
-    return 0;
+        case 2:
+            mpi_app_t::template start<uint16_t>(
+                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+            return 0;
+
+        case 4:
+            mpi_app_t::template start<uint32_t>(
+                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+            return 0;
+
+        default:
+            ctx.cout_master()
+                << "symbol width of " << sym_width << " not supported"
+                << std::endl;
+            return -2;
+    }
 }
