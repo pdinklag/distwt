@@ -59,7 +59,7 @@ void recursiveWT(
         bv.resize(n);
 
         for(size_t i = 0; i < n; i++) {
-            if(text[i] <= m) {
+            if(size_t(text[i]) <= m) {
                 bv[i] = 0;
                 ++z;
             } else {
@@ -73,7 +73,7 @@ void recursiveWT(
         const size_t split = dsplit_str(
             ctx,
             text,
-            [m](const sym_t& x){return (x > m);},
+            [m](const sym_t& x){return (size_t(x) > m);},
             z, n-z,
             (int)node_id);
 
