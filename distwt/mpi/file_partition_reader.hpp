@@ -31,7 +31,9 @@ public:
           m_rank(ctx.rank()),
           m_extracted(false) {
 
-        m_total_size = std::min(util::file_size(m_filename) / sizeof(sym_t), prefix);
+        const size_t w = sizeof(sym_t);
+        const size_t filesize = util::file_size(m_filename);
+        m_total_size = std::min(filesize / w, prefix / w);
         m_size_per_worker = tlx::div_ceil(m_total_size, size_t(ctx.num_workers()));
 
         m_local_offset = m_size_per_worker * size_t(ctx.rank());
