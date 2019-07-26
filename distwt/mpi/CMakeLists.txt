@@ -2,6 +2,7 @@ add_library(distwt-mpi
 
     context.cpp
     malloc.cpp
+    mpi_type.cpp
     uint64_pack.cpp
     wm.cpp
     wt_levelwise.cpp

@@ -3,6 +3,8 @@
 #include <tlx/cmdline_parser.hpp>
 #include <distwt/mpi/context.hpp>
 
+#include <distwt/mpi/uint_types.hpp>
+
 template<typename mpi_app_t>
 int mpi_launch(int argc, char** argv) {
     // Read command-line
@@ -46,6 +48,11 @@ int mpi_launch(int argc, char** argv) {
 
         case 4:
             mpi_app_t::template start<uint32_t>(
+                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+            return 0;
+
+        case 5:
+            mpi_app_t::template start<uint40_t>(
                 ctx, input_filename, prefix, rdbufsize, local_filename, output);
             return 0;
 
