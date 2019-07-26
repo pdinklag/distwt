@@ -17,10 +17,12 @@ protected:
     bits_t m_bits; // layout determined by implementation!
 
 public:
-    inline WaveletTree(const HistogramBase& hist) : WaveletTreeBase(hist) {
+    template<typename sym_t>
+    inline WaveletTree(const HistogramBase<sym_t>& hist) : WaveletTreeBase(hist) {
     }
 
-    inline WaveletTree(const HistogramBase& hist, ctor_t construction_algorithm)
+    template<typename sym_t>
+    inline WaveletTree(const HistogramBase<sym_t>& hist, ctor_t construction_algorithm)
         : WaveletTreeBase(hist) {
 
         construction_algorithm(m_bits, *this);

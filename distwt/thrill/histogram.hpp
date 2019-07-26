@@ -5,7 +5,9 @@
 
 #include <thrill/api/context.hpp>
 
-class Histogram : public HistogramBase {
+#include <distwt/thrill/not_yet_templated.hpp>
+
+class Histogram : public HistogramBase<sym_t> {
 public:
     using HistogramBase::HistogramBase;
 

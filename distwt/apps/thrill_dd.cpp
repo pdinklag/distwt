@@ -28,6 +28,8 @@
 #include <thrill/common/stats_timer.hpp>
 #include <distwt/thrill/result.hpp>
 
+#include <distwt/thrill/not_yet_templated.hpp>
+
 template<typename input_t>
 void recursiveWT(
     WaveletTree::bits_t& bits,
@@ -42,7 +44,7 @@ void recursiveWT(
 
     // compute node BV
     bits[node_id - 1] = input.Keep().Window(thrill::api::DisjointTag, 64,
-        [m](size_t, const std::vector<esym_t>& v) {
+        [m](size_t, const std::vector<sym_t>& v) {
             bv64_t bv;
             for(size_t i = 0; i < v.size(); i++) {
                 if(v[i] > m) {
@@ -53,11 +55,11 @@ void recursiveWT(
         });
 
     // left child
-    auto input_l = input.Keep().Filter([m](const esym_t& c){ return (c <= m); });
+    auto input_l = input.Keep().Filter([m](const sym_t& c){ return (c <= m); });
     recursiveWT(bits, wt, 2ULL * node_id, input_l.Collapse(), a, m);
 
     // right child
-    auto input_r = input.Filter([m](const esym_t& c){ return (c >  m); });
+    auto input_r = input.Filter([m](const sym_t& c){ return (c >  m); });
     recursiveWT(bits, wt, 2ULL * node_id + 1ULL, input_r.Collapse(), m+1, b);
 }
 

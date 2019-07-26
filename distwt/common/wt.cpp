@@ -19,18 +19,3 @@ void recursive_node_sizes(
         recursive_node_sizes(sizes, c, 2ULL * node_id + 1ULL, m+1, b);
     }
 }
-
-std::vector<size_t> WaveletTreeBase::node_sizes(const HistogramBase& hist) {
-    const size_t num_nodes = max_bintree_nodes(wt_height(hist.size()));
-    std::vector<size_t> sizes(num_nodes);
-    
-    auto c = hist.compute_C();
-    recursive_node_sizes(sizes, c, 1, 0, num_nodes);
-
-    return sizes;
-}
-
-WaveletTreeBase::WaveletTreeBase(const HistogramBase& hist)
-    : m_sigma(hist.size()),
-      m_height(wt_height(hist.size())) {
-}

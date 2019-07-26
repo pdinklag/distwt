@@ -17,7 +17,7 @@
 #include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeNodebased::WaveletTreeNodebased(
-    const HistogramBase& hist,
+    const HistogramBase<sym_t>& hist,
     thrill::Context& ctx,
     const std::string& filename) : WaveletTree(hist) {
 
@@ -43,32 +43,32 @@ void WaveletTreeNodebased::save(const std::string& filename) {
     }
 }
 
-thrill::DIA<esym_t> WaveletTreeNodebased::read_node(
+thrill::DIA<sym_t> WaveletTreeNodebased::read_node(
     thrill::Context& ctx, size_t node_id, size_t level) {
 
     const size_t lsh = height() - 1ULL - level;
 
-    return dia_prefix<esym_t>(m_bits[node_id-1]
-        .template FlatMap<esym_t>([lsh](const bv64_t& x, auto emit) {
-            // expand bits to 64 esym_t values
+    return dia_prefix<sym_t>(m_bits[node_id-1]
+        .template FlatMap<sym_t>([lsh](const bv64_t& x, auto emit) {
+            // expand bits to 64 sym_t values
             for(size_t i = 0; i < 64; ++i) {
-                emit(esym_t(x[63ULL-i]) << lsh);
+                emit(sym_t(x[63ULL-i]) << lsh);
             }
         }), m_node_sizes[node_id-1])
         .Collapse();
 }
 
-thrill::DIA<WaveletTreeNodebased::esym_index_t>
+thrill::DIA<WaveletTreeNodebased::sym_index_t>
 WaveletTreeNodebased::decode_recursive(
-    thrill::DIA<WaveletTreeNodebased::esym_index_t> s,
+    thrill::DIA<WaveletTreeNodebased::sym_index_t> s,
     thrill::Context& ctx,
     size_t node_id,
     size_t level) {
 
     auto zipped = s.Zip(
         read_node(ctx, node_id, level),
-        [](const esym_index_t& x, esym_t c){
-            return esym_index_t(x.first | c, x.second);
+        [](const sym_index_t& x, sym_t c){
+            return sym_index_t(x.first | c, x.second);
         }).Cache();
 
     if(level + 1 < height()) {
@@ -76,13 +76,13 @@ WaveletTreeNodebased::decode_recursive(
         const size_t rsh = height() - 1ULL - level;
 
         auto l = decode_recursive(
-            zipped.Filter([rsh](const esym_index_t& x){
+            zipped.Filter([rsh](const sym_index_t& x){
                 return !bool((x.first >> rsh) & 1ULL);
             }).Collapse(),
             ctx, 2ULL * node_id, level + 1);
 
         auto r = decode_recursive(
-            zipped.Filter([rsh](const esym_index_t& x){
+            zipped.Filter([rsh](const sym_index_t& x){
                 return bool((x.first >> rsh) & 1ULL);
             }).Collapse(),
             ctx, 2ULL * node_id + 1ULL, level + 1);
@@ -94,22 +94,22 @@ WaveletTreeNodebased::decode_recursive(
 }
 
 rawtext_t WaveletTreeNodebased::decode(
-    thrill::Context& ctx, const HistogramBase& hist) {
+    thrill::Context& ctx, const HistogramBase<sym_t>& hist) {
 
     // restore text length
     const size_t n = hist.text_length();
 
     // decode
     auto xtext = thrill::api::Generate(ctx, n,
-        [](size_t i){ return esym_index_t(0, i); }
+        [](size_t i){ return sym_index_t(0, i); }
     );
 
     return decode_recursive(xtext, ctx, 1, 0)
-        .Sort([](const esym_index_t& a, const esym_index_t& b){
+        .Sort([](const sym_index_t& a, const sym_index_t& b){
             // sort back by original index
             return a.second < b.second;
         })
-        .Map([hist](const esym_index_t& x){
+        .Map([hist](const sym_index_t& x){
             // undo effective transformation
             return hist.entries[x.first].first;
         })
@@ -119,7 +119,7 @@ rawtext_t WaveletTreeNodebased::decode(
 #include <distwt/thrill/wt_levelwise.hpp>
 
 WaveletTreeLevelwise WaveletTreeNodebased::merge(
-    thrill::Context& ctx, const HistogramBase& hist) {
+    thrill::Context& ctx, const HistogramBase<sym_t>& hist) {
 
     return WaveletTreeLevelwise(hist, // TODO: avoid recomputations!
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){

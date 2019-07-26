@@ -5,8 +5,9 @@
 
 class WaveletTreeLevelwise : public WaveletTree {
 public:
+    template<typename sym_t>
     inline WaveletTreeLevelwise(
-        const HistogramBase& hist,
+        const HistogramBase<sym_t>& hist,
         ctor_t construction_algorithm)
         : WaveletTree(hist, construction_algorithm) {
     }

@@ -15,32 +15,60 @@
 class WaveletTreeLevelwise; // fwd
 class WaveletTreeNodebased : public WaveletTree {
 public:
+    template<typename sym_t>
     inline WaveletTreeNodebased(
-        const HistogramBase& hist,
+        const HistogramBase<sym_t>& hist,
         ctor_t construction_algorithm)
         : WaveletTree(hist, construction_algorithm) {
     }
 
+    template<typename sym_t>
     WaveletTreeLevelwise merge(
         MPIContext& ctx,
-        const FilePartitionReader& input,
-        const HistogramBase& hist,
-        bool discard);
+        const FilePartitionReader<sym_t>& input,
+        const HistogramBase<sym_t>& hist,
+        bool discard) {
 
+        return WaveletTreeLevelwise(hist, // TODO: avoid recomputations!
+            [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
+                merge_impl(ctx, bits, wt, input, hist, discard, false);
+            });
+    }
+
+    template<typename sym_t>
     WaveletMatrix merge_to_matrix(
         MPIContext& ctx,
-        const FilePartitionReader& input,
-        const HistogramBase& hist,
-        bool discard);
+        const FilePartitionReader<sym_t>& input,
+        const HistogramBase<sym_t>& hist,
+        bool discard) {
+
+        return WaveletMatrix(hist, // TODO: avoid recomputations!
+            [&](WaveletMatrix::bits_t& bits, WaveletMatrix::z_t& z, const WaveletMatrixBase& wm){
+                merge_impl(ctx, bits, wm, input, hist, discard, true);
+
+                // compute Z values from histogram
+                const size_t sigma = hist.size();
+                size_t mask = 1ULL << (height() - 1);
+
+                for(size_t level = 0; level < height(); level++) {
+                    size_t num0 = 0;
+                    for(size_t i = 0; i < sigma; i++) {
+                        if((i & mask) == 0) num0 += hist.entries[i].second;
+                    }
+                    z[level] = num0;
+                    mask >>= 1ULL;
+                }
+            });
+    }
 
 private:
-    template<typename bits_t, typename target_t>
+    template<typename sym_t, typename bits_t, typename target_t>
     void merge_impl(
         MPIContext& ctx,
         bits_t& bits,
         const target_t& target,
-        const FilePartitionReader& input,
-        const HistogramBase& hist,
+        const FilePartitionReader<sym_t>& input,
+        const HistogramBase<sym_t>& hist,
         bool discard,
         bool bit_reversal) {
 

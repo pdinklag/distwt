@@ -8,6 +8,8 @@
 #include <thrill/api/dia.hpp>
 #include <thrill/api/size.hpp>
 
+#include <distwt/thrill/not_yet_templated.hpp>
+
 class WaveletTree : public WaveletTreeBase {
 public:
     using bv_t = thrill::DIA<bv64_t>;
@@ -20,10 +22,10 @@ protected:
     bits_t m_bits; // layout determined by implementation!
 
 public:
-    inline WaveletTree(const HistogramBase& hist) : WaveletTreeBase(hist) {
+    inline WaveletTree(const HistogramBase<sym_t>& hist) : WaveletTreeBase(hist) {
     }
 
-    inline WaveletTree(const HistogramBase& hist, ctor_t construction_algorithm)
+    inline WaveletTree(const HistogramBase<sym_t>& hist, ctor_t construction_algorithm)
         : WaveletTreeBase(hist) {
 
         construction_algorithm(m_bits, *this);

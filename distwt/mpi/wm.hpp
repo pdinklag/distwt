@@ -19,10 +19,12 @@ protected:
     bits_t m_bits; // one bit vector per level
 
 public:
-    inline WaveletMatrix(const HistogramBase& hist) : WaveletMatrixBase(hist) {
+    template<typename sym_t>
+    inline WaveletMatrix(const HistogramBase<sym_t>& hist) : WaveletMatrixBase(hist) {
     }
 
-    inline WaveletMatrix(const HistogramBase& hist, ctor_t construction_algorithm)
+    template<typename sym_t>
+    inline WaveletMatrix(const HistogramBase<sym_t>& hist, ctor_t construction_algorithm)
         : WaveletMatrixBase(hist) {
 
         construction_algorithm(m_bits, m_z, *this);

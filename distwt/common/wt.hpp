@@ -7,6 +7,13 @@
 
 #include <distwt/common/histogram.hpp>
 
+void recursive_node_sizes(
+    std::vector<size_t>& sizes,
+    const std::vector<size_t>& c,
+    size_t node_id,
+    size_t a,
+    size_t b);
+
 class WaveletTreeBase {
 protected:
     size_t m_sigma;
@@ -21,7 +28,16 @@ protected:
     }
 
 public:
-    static std::vector<size_t> node_sizes(const HistogramBase& hist);
+    template<typename sym_t>
+    static std::vector<size_t> node_sizes(const HistogramBase<sym_t>& hist) {
+        const size_t num_nodes = max_bintree_nodes(wt_height(hist.size()));
+        std::vector<size_t> sizes(num_nodes);
+
+        auto c = hist.compute_C();
+        recursive_node_sizes(sizes, c, 1, 0, num_nodes);
+
+        return sizes;
+    }
 
     static inline std::string histogram_extension() {
         return "hist";
@@ -35,7 +51,11 @@ public:
         return "node_" + std::to_string(node_id);
     }
 
-    WaveletTreeBase(const HistogramBase& hist);
+    template<typename sym_t>
+    inline WaveletTreeBase(const HistogramBase<sym_t>& hist)
+        : m_sigma(hist.size()),
+          m_height(wt_height(hist.size())) {
+    }
 
     inline size_t sigma() const { return m_sigma; }
     inline size_t height() const { return m_height; }

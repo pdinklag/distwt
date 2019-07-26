@@ -30,10 +30,6 @@ target_link_libraries(thrill-bsort ${THRILL_APP_DEPENDENCIES})
 add_executable(thrill-dd thrill_dd.cpp)
 target_link_libraries(thrill-dd ${THRILL_APP_DEPENDENCIES})
 
-# Thrill Flat DD
-add_executable(thrill-flat-dd thrill_flat_dd.cpp)
-target_link_libraries(thrill-flat-dd ${THRILL_APP_DEPENDENCIES})
-
 # Thrill Input Benchmark
 add_executable(thrill-input thrill_input.cpp)
 target_link_libraries(thrill-input ${THRILL_APP_DEPENDENCIES})

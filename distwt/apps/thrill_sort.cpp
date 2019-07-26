@@ -26,6 +26,8 @@
 #include <thrill/common/stats_timer.hpp>
 #include <distwt/thrill/result.hpp>
 
+#include <distwt/thrill/not_yet_templated.hpp>
+
 int main(int argc, const char** argv) {
     // Read command-line
     tlx::CmdlineParser cp;
@@ -90,7 +92,7 @@ int main(int argc, const char** argv) {
 
                 // compute and store BV
                 bits[level] = text.Keep().Window(thrill::api::DisjointTag, 64,
-                    [rsh](size_t, const std::vector<esym_t>& v) {
+                    [rsh](size_t, const std::vector<sym_t>& v) {
                         bv64_t bv;
                         for(size_t i = 0; i < v.size(); i++) {
                             // check level-th bit of symbol
@@ -104,7 +106,7 @@ int main(int argc, const char** argv) {
 
                 if(level+1 < height) {
                     text = text.SortStable(
-                        [rsh](esym_t a, esym_t b){
+                        [rsh](sym_t a, sym_t b){
                             // stably sort according to newest bit
                             return (a >> rsh) < (b >> rsh);
                         }).Collapse();

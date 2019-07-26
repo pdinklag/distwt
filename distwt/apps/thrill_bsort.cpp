@@ -24,11 +24,13 @@
 #include <distwt/thrill/text.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
-#include <distwt/thrill/esym_pack.hpp>
+#include <distwt/thrill/sym_pack.hpp>
 #include <distwt/thrill/wt_levelwise.hpp>
 
 #include <thrill/common/stats_timer.hpp>
 #include <distwt/thrill/result.hpp>
+
+#include <distwt/thrill/not_yet_templated.hpp>
 
 int main(int argc, const char** argv) {
     // Read command-line
@@ -96,7 +98,7 @@ int main(int argc, const char** argv) {
 
                 // compute and store BV
                 bits[level] = text.Keep().Window(thrill::api::DisjointTag, 64,
-                    [rsh](size_t, const std::vector<esym_t>& v) {
+                    [rsh](size_t, const std::vector<sym_t>& v) {
                         bv64_t bv;
                         for(size_t i = 0; i < v.size(); i++) {
                             // check level-th bit of symbol
@@ -109,7 +111,7 @@ int main(int argc, const char** argv) {
                     .Cache();
 
                 // stable bucket sort of text
-                using indexed_pack_t = std::pair<size_t, esym_pack_word_t>;
+                using indexed_pack_t = std::pair<size_t, sym_pack_word_t>;
                 if(level+1 < height) {
                     const size_t num_nlevel_nodes = 1ULL << (level+1);
                     const size_t first_nlevel_node = num_nlevel_nodes;
@@ -125,18 +127,18 @@ int main(int argc, const char** argv) {
                     for(size_t v = 0; v < num_nlevel_nodes; v++) {
                         buckets[v] =
                         (v+1 == num_nlevel_nodes ? text : text.Keep())
-                        .Filter([rsh,v](esym_t x){ return ((x >> rsh) == v); })
-                        .Window(thrill::api::DisjointTag, esym_pack_size,
-                        [](size_t, const std::vector<esym_t>& v){
+                        .Filter([rsh,v](sym_t x){ return ((x >> rsh) == v); })
+                        .Window(thrill::api::DisjointTag, sym_pack_size,
+                        [](size_t, const std::vector<sym_t>& v){
                             // pack symbols into 64-bit words
-                            esym_pack_t pack;
+                            sym_pack_t pack;
                             for(size_t i = 0; i < v.size(); i++) {
                                 pack.sym[i] = v[i];
                             }
                             return pack.packed;
                         })
                         .ZipWithIndex([glob_node_offs](
-                            esym_pack_word_t x, size_t index) {
+                            sym_pack_word_t x, size_t index) {
 
                             return indexed_pack_t(glob_node_offs+index, x);
                         });
@@ -144,7 +146,7 @@ int main(int argc, const char** argv) {
                         // compute alignment data structure
                         const size_t node_id = first_nlevel_node + v;
                         const size_t num_blocks = tlx::div_ceil(
-                            node_sizes[node_id-1], esym_pack_size);
+                            node_sizes[node_id-1], sym_pack_size);
 
                         blocks[v] = (v > 0)
                             ? (blocks[v-1] + num_blocks)
@@ -161,30 +163,30 @@ int main(int argc, const char** argv) {
                             //sort by indices
                             return a.first < b.first;
                         })
-                        .template FlatWindow<esym_t>(1,
+                        .template FlatWindow<sym_t>(1,
                         [first_nlevel_node,node_sizes,blocks](
                         size_t rank,
                         const thrill::common::RingBuffer<indexed_pack_t>& v,
                         auto emit){
                             // unpack symbols from 64-bit word
-                            esym_pack_t pack;
+                            sym_pack_t pack;
                             pack.packed = v[0].second;
 
                             // find node that current block belongs to
                             size_t i = 0;
                             while(blocks[i] <= rank) ++i;
 
-                            // determine block size (<= esym_pack_size at node borders)
+                            // determine block size (<= sym_pack_size at node borders)
                             size_t block_size;
                             if(rank+1 == blocks[i]) {
                                 const size_t sz_mod =
-                                    node_sizes[first_nlevel_node+i-1] % esym_pack_size;
+                                    node_sizes[first_nlevel_node+i-1] % sym_pack_size;
 
                                 block_size = (sz_mod == 0ULL)
-                                    ? esym_pack_size
+                                    ? sym_pack_size
                                     : sz_mod;
                             } else {
-                                block_size = esym_pack_size;
+                                block_size = sym_pack_size;
                             }
 
                             // emit symbols, discard alignment bytes

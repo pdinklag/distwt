@@ -14,7 +14,7 @@
 #include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeLevelwise::WaveletTreeLevelwise(
-    const HistogramBase& hist,
+    const HistogramBase<sym_t>& hist,
     thrill::Context& ctx,
     const std::string& filename) : WaveletTree(hist) {
 
@@ -32,35 +32,35 @@ void WaveletTreeLevelwise::save(const std::string& filename) {
 }
 
 rawtext_t WaveletTreeLevelwise::decode(
-    thrill::Context& ctx, const HistogramBase& hist) {
+    thrill::Context& ctx, const HistogramBase<sym_t>& hist) {
 
     // indexed symbol
-    using esym_index_t = std::pair<esym_t, size_t>;
+    using sym_index_t = std::pair<sym_t, size_t>;
 
     // restore text length
     const size_t n = hist.text_length();
 
     // construct indexed sequence of 0 symbols
     auto xtext = thrill::api::Generate(ctx, n, [](size_t i){
-        return esym_index_t(0, i);}
+        return sym_index_t(0, i);}
     );
 
     // reconstruct symbols from bit vector level by level
     for(size_t level = 0; level < height(); level++) {
         const size_t lsh = height() - 1ULL - level;
 
-        xtext = dia_prefix<esym_t>(m_bits[level]
-            .template FlatMap<esym_t>([lsh](const bv64_t& x, auto emit) {
+        xtext = dia_prefix<sym_t>(m_bits[level]
+            .template FlatMap<sym_t>([lsh](const bv64_t& x, auto emit) {
                 // expand bits to 64 boolean values
                 for(size_t i = 0; i < 64; ++i) {
-                    emit(esym_t(x[63ULL-i]) << lsh);
+                    emit(sym_t(x[63ULL-i]) << lsh);
                 }
             }), n)
-            .Zip(xtext, [lsh](esym_t c, esym_index_t x) {
+            .Zip(xtext, [lsh](sym_t c, sym_index_t x) {
                 // OR symbols using current vector
-                return esym_index_t(x.first | c, x.second);
+                return sym_index_t(x.first | c, x.second);
             })
-            .SortStable([lsh](esym_index_t a, esym_index_t b){
+            .SortStable([lsh](sym_index_t a, sym_index_t b){
                 // stably reorder according to newest bit
                 return (a.first >> lsh) < (b.first >> lsh);
             })
@@ -69,11 +69,11 @@ rawtext_t WaveletTreeLevelwise::decode(
 
     // restore original text
     return xtext
-        .Sort([](esym_index_t a, esym_index_t b){
+        .Sort([](sym_index_t a, sym_index_t b){
             // sort back by original index
             return a.second < b.second;
         })
-        .Map([hist](esym_index_t x){ // TODO: capture hist by reference?
+        .Map([hist](sym_index_t x){ // TODO: capture hist by reference?
             // undo effective transformation
             return hist.entries[x.first].first;
         })

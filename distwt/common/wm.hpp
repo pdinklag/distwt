@@ -23,7 +23,13 @@ public:
         return "z";
     }
 
-    WaveletMatrixBase(const HistogramBase& hist);
+    template<typename sym_t>
+    inline WaveletMatrixBase(const HistogramBase<sym_t>& hist)
+        : WaveletTreeBase(hist) {
+
+        // allocate Z values
+        m_z = std::vector<size_t>(height());
+    }
 
     void save_z(const std::string& filename) const;
 
