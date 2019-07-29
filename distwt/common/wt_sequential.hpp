@@ -10,8 +10,8 @@
 using wt_bits_t = std::vector<std::vector<bool>>;
 
 // prefix counting for wavelet subtree
-template<typename sym_t>
-void wt_pc(
+template<typename sym_t, typename idx_t>
+inline void wt_pc(
     wt_bits_t& bits,
     const std::vector<sym_t>& text,
     const size_t root_node_id, // 1-based!!
@@ -28,7 +28,7 @@ void wt_pc(
     assert(h > 1);
 
     // compute histogram and root node
-    std::vector<size_t> hist(sigma);
+    std::vector<idx_t> hist(sigma);
     {
         const size_t test = 1ULL << (glob_h - 1 - root_level);
 
@@ -49,7 +49,7 @@ void wt_pc(
     }
 
     // compute the rest bottom-up
-    std::vector<size_t> count(sigma/2); // allocate counters
+    std::vector<idx_t> count(sigma/2); // allocate counters
     for(size_t level = h-1; level > 0; --level) {
         const size_t num_level_nodes = (1ULL << level);
         //const size_t first_level_node = num_level_nodes - 1;
@@ -80,7 +80,8 @@ void wt_pc(
             //assert(v < num_level_nodes);
             const size_t node = glob_offs + v;
 
-            const size_t pos = count[v]++;
+            const size_t pos = count[v];
+            ++count[v];
             const bool b = c & test;
 
             //assert(pos < hist[v]);
@@ -90,12 +91,12 @@ void wt_pc(
 }
 
 // prefix counting
-template<typename sym_t>
+template<typename sym_t, typename idx_t>
 inline void wt_pc(
     const WaveletTreeBase& wt,
     wt_bits_t& bits,
     const std::vector<sym_t>& text) {
 
-    wt_pc(bits, text, 1, wt.height());
+    wt_pc<sym_t, idx_t>(bits, text, 1, wt.height());
 }
 

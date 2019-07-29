@@ -1,7 +1,8 @@
 #pragma once
 
 #include <distwt/common/wm.hpp>
-#include <distwt/common/histogram.hpp>
+
+#include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/bit_vector.hpp>
 #include <distwt/mpi/context.hpp>
 
@@ -20,11 +21,11 @@ protected:
 
 public:
     template<typename sym_t>
-    inline WaveletMatrix(const HistogramBase<sym_t>& hist) : WaveletMatrixBase(hist) {
+    inline WaveletMatrix(const Histogram<sym_t>& hist) : WaveletMatrixBase(hist) {
     }
 
     template<typename sym_t>
-    inline WaveletMatrix(const HistogramBase<sym_t>& hist, ctor_t construction_algorithm)
+    inline WaveletMatrix(const Histogram<sym_t>& hist, ctor_t construction_algorithm)
         : WaveletMatrixBase(hist) {
 
         construction_algorithm(m_bits, m_z, *this);

@@ -83,7 +83,7 @@ static void start(
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
 
         bits.resize(wt.num_nodes());
-        wt_pc(wt, bits, etext);
+        wt_pc<sym_t, idx_t>(wt, bits, etext);
     });
 
     // Clean up

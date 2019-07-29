@@ -23,8 +23,8 @@ public:
         return "z";
     }
 
-    template<typename sym_t>
-    inline WaveletMatrixBase(const HistogramBase<sym_t>& hist)
+    template<typename sym_t, typename idx_t>
+    inline WaveletMatrixBase(const HistogramBase<sym_t, idx_t>& hist)
         : WaveletTreeBase(hist) {
 
         // allocate Z values

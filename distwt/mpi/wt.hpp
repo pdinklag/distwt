@@ -1,8 +1,8 @@
 #pragma once
 
 #include <distwt/common/wt.hpp>
-#include <distwt/common/histogram.hpp>
 #include <distwt/mpi/bit_vector.hpp>
+#include <distwt/mpi/histogram.hpp>
 
 #include <functional>
 
@@ -18,11 +18,11 @@ protected:
 
 public:
     template<typename sym_t>
-    inline WaveletTree(const HistogramBase<sym_t>& hist) : WaveletTreeBase(hist) {
+    inline WaveletTree(const Histogram<sym_t>& hist) : WaveletTreeBase(hist) {
     }
 
     template<typename sym_t>
-    inline WaveletTree(const HistogramBase<sym_t>& hist, ctor_t construction_algorithm)
+    inline WaveletTree(const Histogram<sym_t>& hist, ctor_t construction_algorithm)
         : WaveletTreeBase(hist) {
 
         construction_algorithm(m_bits, *this);

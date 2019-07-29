@@ -7,9 +7,9 @@
 
 #include <distwt/thrill/not_yet_templated.hpp>
 
-class Histogram : public HistogramBase<sym_t> {
+class Histogram : public HistogramBase<sym_t, idx_t> {
 public:
-    using HistogramBase::HistogramBase;
+    using HistogramBase<sym_t, idx_t>::HistogramBase;
 
     Histogram(
         thrill::Context& ctx,

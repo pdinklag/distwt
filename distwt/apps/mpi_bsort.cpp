@@ -93,7 +93,7 @@ static void start(
         #endif
 
         std::vector<std::vector<sym_t>> buckets;
-        std::vector<size_t> bucket_sizes;
+        std::vector<idx_t> bucket_sizes;
 
         std::vector<uint64_t*> msg_headers;
         for(size_t level = 0; level < height; level++) {
@@ -143,9 +143,9 @@ static void start(
                 // -> this corresponds to bucket sort with < sigma keys
 
                 // compute bucket size prefix sums
-                std::vector<size_t> bucket_offs(num_nlevel_nodes);
+                std::vector<idx_t> bucket_offs(num_nlevel_nodes);
                 for(size_t v = 0; v < num_nlevel_nodes; v++) {
-                    bucket_offs[v] = buckets[v].size();
+                    bucket_offs[v] = idx_t(buckets[v].size());
                 }
                 ctx.ex_scan(bucket_offs);
 

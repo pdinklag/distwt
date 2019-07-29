@@ -8,6 +8,7 @@
 
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
+#include <distwt/mpi/types.hpp>
 
 #include <distwt/common/bitrev.hpp>
 #include <distwt/mpi/uint64_pack_bv64.hpp>
@@ -17,7 +18,7 @@ class WaveletTreeNodebased : public WaveletTree {
 public:
     template<typename sym_t>
     inline WaveletTreeNodebased(
-        const HistogramBase<sym_t>& hist,
+        const Histogram<sym_t>& hist,
         ctor_t construction_algorithm)
         : WaveletTree(hist, construction_algorithm) {
     }
@@ -26,7 +27,7 @@ public:
     WaveletTreeLevelwise merge(
         MPIContext& ctx,
         const FilePartitionReader<sym_t>& input,
-        const HistogramBase<sym_t>& hist,
+        const Histogram<sym_t>& hist,
         bool discard) {
 
         return WaveletTreeLevelwise(hist, // TODO: avoid recomputations!
@@ -39,7 +40,7 @@ public:
     WaveletMatrix merge_to_matrix(
         MPIContext& ctx,
         const FilePartitionReader<sym_t>& input,
-        const HistogramBase<sym_t>& hist,
+        const Histogram<sym_t>& hist,
         bool discard) {
 
         return WaveletMatrix(hist, // TODO: avoid recomputations!
@@ -68,7 +69,7 @@ private:
         bits_t& bits,
         const target_t& target,
         const FilePartitionReader<sym_t>& input,
-        const HistogramBase<sym_t>& hist,
+        const Histogram<sym_t>& hist,
         bool discard,
         bool bit_reversal) {
 
@@ -86,11 +87,11 @@ private:
         ctx.cout_master() << "Distributing node prefix sums ..." << std::endl;
 
         const size_t num_nodes = this->num_nodes();
-        std::vector<size_t> local_node_offs(num_nodes);
+        std::vector<idx_t> local_node_offs(num_nodes);
         {
             // compute prefix sum of local node sizes
             for(size_t i = 0; i < num_nodes; i++) {
-                local_node_offs[i] = m_bits[i].size();
+                local_node_offs[i] = idx_t(m_bits[i].size());
             }
 
             ctx.ex_scan(local_node_offs);

@@ -39,7 +39,7 @@ void recursiveWT(
 
         // compute sequential
         const size_t wsubtree_height = tlx::integer_log2_ceil(b-a+1);
-        wt_pc(
+        wt_pc<sym_t, idx_t>(
             bits,
             text,
             node_id,          // subtree root

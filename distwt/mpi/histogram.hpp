@@ -6,14 +6,15 @@
 
 #include <distwt/common/util.hpp>
 #include <distwt/mpi/util.hpp>
+#include <distwt/mpi/types.hpp>
 
 #include <algorithm>
 #include <tlx/math/integer_log2.hpp>
 
 template<typename sym_t>
-class Histogram : public HistogramBase<sym_t> {
+class Histogram : public HistogramBase<sym_t, idx_t> {
 public:
-    using HistogramBase<sym_t>::HistogramBase;
+    using HistogramBase<sym_t, idx_t>::HistogramBase;
 
     inline Histogram(
         MPIContext& ctx,
@@ -29,14 +30,14 @@ public:
 
 private:
     // base implementation for arbritrary alphabets
-    void compute_histogram(
+    inline void compute_histogram(
         MPIContext& ctx,
         const FilePartitionReader<sym_t>& input,
         const size_t rdbufsize) {
 
         {
             // compute local histogram
-            std::unordered_map<sym_t, size_t> local_hist;
+            std::unordered_map<sym_t, idx_t> local_hist;
 
             input.process_local([&](sym_t c){
                 auto it = local_hist.find(c);
@@ -50,7 +51,7 @@ private:
             // distribute using tree-like communication
             {
                 std::vector<sym_t> buf_syms;
-                std::vector<size_t>   buf_occs;
+                std::vector<idx_t> buf_occs;
 
                 const size_t rank = ctx.rank();
                 const size_t p = ctx.num_workers();
@@ -154,8 +155,8 @@ private:
 
         // sort entries
         std::sort(this->m_entries.begin(), this->m_entries.end(),
-            [](const typename HistogramBase<sym_t>::entry_t& a,
-               const typename HistogramBase<sym_t>::entry_t& b){
+            [](const typename HistogramBase<sym_t, idx_t>::entry_t& a,
+               const typename HistogramBase<sym_t, idx_t>::entry_t& b){
                 return a.first < b.first;
             });
 
@@ -172,7 +173,7 @@ private:
 
 // specialization for 8-bit alphabets
 template<>
-void Histogram<uint8_t>::compute_histogram(
+inline void Histogram<uint8_t>::compute_histogram(
     MPIContext& ctx,
     const FilePartitionReader<uint8_t>& input,
     const size_t rdbufsize) {

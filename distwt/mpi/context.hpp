@@ -10,6 +10,7 @@
 #include <distwt/common/devnull.hpp>
 #include <distwt/common/util.hpp>
 
+#include <distwt/mpi/mpi_sum.hpp>
 #include <distwt/mpi/mpi_type.hpp>
 
 class MPIContext {
@@ -190,16 +191,16 @@ private:
 public:
     template<typename T>
     inline void all_reduce(
-        const T* sbuf, T* rbuf, size_t num, MPI_Op op = MPI_SUM) {
+        const T* sbuf, T* rbuf, size_t num) {
 
-        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, m_comm);
+        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), mpi_sum<T>::op(), m_comm);
         simulate_allreduce_traffic(sizeof(int) + num * sizeof(T));
     }
 
     template<typename T>
-    inline void all_reduce(std::vector<T>& v, MPI_Op op = MPI_SUM) {
+    inline void all_reduce(std::vector<T>& v) {
         std::vector<T> rbuf(v.size());
-        all_reduce(v.data(), rbuf.data(), v.size(), op);
+        all_reduce(v.data(), rbuf.data(), v.size());
         v = rbuf;
     }
 
@@ -241,19 +242,19 @@ private:
 
 public:
     template<typename T>
-    inline void scan(std::vector<T>& v, MPI_Op op = MPI_SUM) {
+    inline void scan(std::vector<T>& v) {
         std::vector<T> rbuf(v.size());
         MPI_Scan(v.data(), rbuf.data(), v.size(),
-            mpi_type<T>::id(), op, m_comm);
+            mpi_type<T>::id(), mpi_sum<T>::op(), m_comm);
         v = rbuf;
         simulate_scan_traffic(sizeof(int) + v.size() * sizeof(T));
     }
 
     template<typename T>
-    inline void ex_scan(std::vector<T>& v, MPI_Op op = MPI_SUM) {
+    inline void ex_scan(std::vector<T>& v) {
         std::vector<T> rbuf(v.size());
         MPI_Exscan(v.data(), rbuf.data(), v.size(),
-            mpi_type<T>::id(), op, m_comm);
+            mpi_type<T>::id(), mpi_sum<T>::op(), m_comm);
         v = rbuf;
         simulate_scan_traffic(sizeof(int) + v.size() * sizeof(T));
     }

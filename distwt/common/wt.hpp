@@ -7,13 +7,6 @@
 
 #include <distwt/common/histogram.hpp>
 
-void recursive_node_sizes(
-    std::vector<size_t>& sizes,
-    const std::vector<size_t>& c,
-    size_t node_id,
-    size_t a,
-    size_t b);
-
 class WaveletTreeBase {
 protected:
     size_t m_sigma;
@@ -27,11 +20,30 @@ protected:
         return (1ULL << height) - 1ULL;
     }
 
+    template<typename idx_t>
+    static void recursive_node_sizes(
+        std::vector<idx_t>& sizes,
+        const std::vector<idx_t>& c,
+        size_t node_id,
+        size_t a,
+        size_t b) {
+
+        if(a < b) {
+            sizes[node_id - 1] =
+                c[std::min(b+1, c.size()-1)] -
+                c[std::min(a,   c.size()-1)];
+
+            const size_t m = (a+b)/2;
+            recursive_node_sizes(sizes, c, 2ULL * node_id, a, m);
+            recursive_node_sizes(sizes, c, 2ULL * node_id + 1ULL, m+1, b);
+        }
+    }
+
 public:
-    template<typename sym_t>
-    static std::vector<size_t> node_sizes(const HistogramBase<sym_t>& hist) {
+    template<typename sym_t, typename idx_t>
+    static std::vector<idx_t> node_sizes(const HistogramBase<sym_t, idx_t>& hist) {
         const size_t num_nodes = max_bintree_nodes(wt_height(hist.size()));
-        std::vector<size_t> sizes(num_nodes);
+        std::vector<idx_t> sizes(num_nodes);
 
         auto c = hist.compute_C();
         recursive_node_sizes(sizes, c, 1, 0, num_nodes);
@@ -51,8 +63,8 @@ public:
         return "node_" + std::to_string(node_id);
     }
 
-    template<typename sym_t>
-    inline WaveletTreeBase(const HistogramBase<sym_t>& hist)
+    template<typename sym_t, typename idx_t>
+    inline WaveletTreeBase(const HistogramBase<sym_t, idx_t>& hist)
         : m_sigma(hist.size()),
           m_height(wt_height(hist.size())) {
     }

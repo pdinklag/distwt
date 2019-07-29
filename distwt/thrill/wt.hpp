@@ -1,8 +1,9 @@
 #pragma once
 
 #include <distwt/common/wt.hpp>
-#include <distwt/common/histogram.hpp>
+
 #include <distwt/thrill/bv64.hpp>
+#include <distwt/thrill/histogram.hpp>
 
 #include <functional>
 #include <thrill/api/dia.hpp>
@@ -22,10 +23,10 @@ protected:
     bits_t m_bits; // layout determined by implementation!
 
 public:
-    inline WaveletTree(const HistogramBase<sym_t>& hist) : WaveletTreeBase(hist) {
+    inline WaveletTree(const Histogram& hist) : WaveletTreeBase(hist) {
     }
 
-    inline WaveletTree(const HistogramBase<sym_t>& hist, ctor_t construction_algorithm)
+    inline WaveletTree(const Histogram& hist, ctor_t construction_algorithm)
         : WaveletTreeBase(hist) {
 
         construction_algorithm(m_bits, *this);

@@ -17,7 +17,7 @@
 #include <distwt/thrill/dia_prefix.hpp>
 
 WaveletTreeNodebased::WaveletTreeNodebased(
-    const HistogramBase<sym_t>& hist,
+    const Histogram& hist,
     thrill::Context& ctx,
     const std::string& filename) : WaveletTree(hist) {
 
@@ -94,7 +94,7 @@ WaveletTreeNodebased::decode_recursive(
 }
 
 rawtext_t WaveletTreeNodebased::decode(
-    thrill::Context& ctx, const HistogramBase<sym_t>& hist) {
+    thrill::Context& ctx, const Histogram& hist) {
 
     // restore text length
     const size_t n = hist.text_length();
@@ -119,7 +119,7 @@ rawtext_t WaveletTreeNodebased::decode(
 #include <distwt/thrill/wt_levelwise.hpp>
 
 WaveletTreeLevelwise WaveletTreeNodebased::merge(
-    thrill::Context& ctx, const HistogramBase<sym_t>& hist) {
+    thrill::Context& ctx, const Histogram& hist) {
 
     return WaveletTreeLevelwise(hist, // TODO: avoid recomputations!
     [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){

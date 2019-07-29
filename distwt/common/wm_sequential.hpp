@@ -12,12 +12,12 @@ using wm_bits_t = std::vector<std::vector<bool>>;
 using wm_z_t    = std::vector<size_t>;
 
 // prefix counting for wavelet matrix
-template<typename symbol_t>
+template<typename sym_t, typename idx_t>
 void wm_pc(
     const WaveletMatrixBase& wm,
     wm_bits_t& bits,
     wm_z_t& z,
-    const std::vector<symbol_t>& text) {
+    const std::vector<sym_t>& text) {
 
     const size_t root_node_id = 1;
     const size_t h = wm.height();
@@ -27,7 +27,7 @@ void wm_pc(
     assert(h > 1);
 
     // compute histogram and top level
-    std::vector<size_t> hist(sigma);
+    std::vector<idx_t> hist(sigma);
     {
         const size_t test = 1ULL << (h - 1); // MSB
         size_t num0 = 0;
@@ -48,7 +48,7 @@ void wm_pc(
     }
 
     // compute the rest bottom-up
-    std::vector<size_t> borders(sigma/2); // allocate borders
+    std::vector<idx_t> borders(sigma/2); // allocate borders
 
     for(size_t level = h-1; level > 0; --level) {
         // allocate bit vector
@@ -82,7 +82,8 @@ void wm_pc(
             const size_t c = text[i];
             const size_t v = (c >> rsh);
 
-            const size_t pos = borders[v]++;
+            const size_t pos = borders[v];
+            ++borders[v];
             const bool b = c & test;
 
             if(!b) ++num0;
