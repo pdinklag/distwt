@@ -79,11 +79,8 @@ static void start(
     std::unique_ptr<Histogram<sym_t>> hist;
     
     if(eff_input) {
-        ctx.cout_master() << "Skipping histogram computation!" << std::endl;
-        time.hist = 0;
-
         // Load input and find maximum symbol
-        ctx.cout_master() << "Loading input ..." << std::endl;
+        ctx.cout_master() << "Loading input (skipping histogram computation) ..." << std::endl;
         sym_t local_max = 0;
         
         etext.reserve(local_num);
@@ -99,8 +96,11 @@ static void start(
         // Create dummy histogram instance
         hist = std::make_unique<DummyHistogram<sym_t>>(glob_max);
 
+        time.hist = dt();
+
         // Update timer
-        time.eff = dt();
+        time.eff = 0;
+        dt();
     } else {
         // Compute histogram
         ctx.cout_master() << "Compute histogram ..." << std::endl;
