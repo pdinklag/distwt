@@ -32,6 +32,8 @@ std::string ResultBase::readable() const {
         << tlx::format_iec_units(m_traffic, 3) << "B of net traffic"
         << " (" << tlx::format_iec_units(m_traffic_asym, 3) << "B assymetry) "
         << "using at most " << tlx::format_iec_units(m_memory, 3)
-        << "B of overall RAM.";
+        << "B of overall RAM (avg "
+        << tlx::format_iec_units(m_memory / (m_workers_per_node * m_nodes), 3)
+        << " per worker).";
     return oss.str();
 }
