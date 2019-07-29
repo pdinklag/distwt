@@ -141,7 +141,7 @@ static void start(
         std::vector<sym_t> buffer(local_num);
         size_t num0;
 
-        uint64_t msg_header1[2], msg_header2[2], rheader[2];
+        uint64_t msg_header1[2][2], msg_header2[2][2], rheader[2];
         //std::vector<uint64_t*> msg_headers;
         for(size_t level = 0; level < height; level++) {
             const int tag = int(level);
@@ -268,10 +268,10 @@ static void start(
                         const size_t target = target1;
 
                         // send one message
-                        msg_header1[0] = glob_buffer_offs;
-                        msg_header1[1] = buffer_size[b];
+                        msg_header1[b][0] = glob_buffer_offs;
+                        msg_header1[b][1] = buffer_size[b];
 
-                        ctx.isend(msg_header1, 2, target, tag);
+                        ctx.isend(msg_header1[b], 2, target, tag);
                         ctx.isend(buffer_ptr[b], buffer_size[b], target, tag);
 
                         #ifdef DBG_CONCAT
@@ -295,8 +295,8 @@ static void start(
 
                         // message to first
                         {
-                            msg_header1[0] = glob_buffer_offs;
-                            msg_header1[1] = size1;
+                            msg_header1[b][0] = glob_buffer_offs;
+                            msg_header1[b][1] = size1;
 
                             #ifdef DBG_CONCAT
                             ctx.cout()
@@ -306,16 +306,16 @@ static void start(
                                 << std::endl;
                             #endif
 
-                            ctx.isend(msg_header1, 2, target1, tag);
+                            ctx.isend(msg_header1[b], 2, target1, tag);
                             ctx.isend(buffer_ptr[b], size1, target1, tag);
                         }
 
                         // message to second
                         {
-                            msg_header2[0] = glob_first2;
-                            msg_header2[1] = size2;
+                            msg_header2[b][0] = glob_first2;
+                            msg_header2[b][1] = size2;
 
-                            ctx.isend(msg_header2, 2, target2, tag);
+                            ctx.isend(msg_header2[b], 2, target2, tag);
                             ctx.isend(
                                 buffer_ptr[b] + size1, size2, target2, tag);
 
