@@ -9,6 +9,7 @@
 
 #include <distwt/mpi/context.hpp>
 #include <distwt/mpi/file_partition_reader.hpp>
+#include <distwt/mpi/mpi_max.hpp>
 
 #include <distwt/mpi/histogram.hpp>
 #include <distwt/mpi/effective_alphabet.hpp>
@@ -81,18 +82,22 @@ static void start(
         ctx.cout_master() << "Skipping histogram computation!" << std::endl;
         time.hist = 0;
 
-        // Load input and find maximum element
+        // Load input and find maximum symbol
         ctx.cout_master() << "Loading input ..." << std::endl;
-        sym_t max = 0;
+        sym_t local_max = 0;
         
         etext.reserve(local_num);
         input.process_local([&](const sym_t x){
-            max = std::max(x, max);
+            local_max = std::max(x, local_max);
             etext.push_back(x);
         }, rdbufsize);
 
+        // Reduce maximum symbol
+        sym_t glob_max;
+        ctx.all_reduce(&local_max, &glob_max, 1, mpi_max<sym_t>::op());
+
         // Create dummy histogram instance
-        hist = std::make_unique<DummyHistogram<sym_t>>(max);
+        hist = std::make_unique<DummyHistogram<sym_t>>(glob_max);
 
         // Update timer
         time.eff = dt();

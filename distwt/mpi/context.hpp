@@ -191,6 +191,14 @@ private:
 public:
     template<typename T>
     inline void all_reduce(
+        const T* sbuf, T* rbuf, size_t num, MPI_Op op) {
+
+        MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), op, m_comm);
+        simulate_allreduce_traffic(sizeof(int) + num * sizeof(T));
+    }
+
+    template<typename T>
+    inline void all_reduce(
         const T* sbuf, T* rbuf, size_t num) {
 
         MPI_Allreduce(sbuf, rbuf, num, mpi_type<T>::id(), mpi_sum<T>::op(), m_comm);
