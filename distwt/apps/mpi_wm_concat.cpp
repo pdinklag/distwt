@@ -1,6 +1,7 @@
 #include "mpi_launcher.hpp"
 
 #include <cassert>
+#include <memory>
 #include <vector>
 
 #include <tlx/cmdline_parser.hpp>
@@ -17,6 +18,20 @@
 
 //#define DBG_CONCAT 1
 
+template<typename sym_t>
+class DummyHistogram : public Histogram<sym_t> {
+private:
+    size_t m_size;
+    
+public:
+    inline DummyHistogram(size_t size) : m_size(size) {
+    }
+
+    virtual inline size_t size() const override {
+        return m_size;
+    }
+};
+
 class mpi_wm_concat {
 public:
 
@@ -27,6 +42,7 @@ static void start(
     const size_t prefix,
     const size_t in_rdbufsize,
     const std::string& local_filename,
+    const bool eff_input,
     const std::string& output) {
 
     Result::Time time;
@@ -58,27 +74,51 @@ static void start(
 
     time.input = dt();
 
-    // Compute histogram
-    ctx.cout_master() << "Compute histogram ..." << std::endl;
-    Histogram<sym_t> hist(ctx, input, rdbufsize);
+    std::vector<sym_t> etext;
+    std::unique_ptr<Histogram<sym_t>> hist;
+    
+    if(eff_input) {
+        ctx.cout_master() << "Skipping histogram computation!" << std::endl;
+        time.hist = 0;
 
-    time.hist = dt();
+        // Load input and find maximum element
+        ctx.cout_master() << "Loading input ..." << std::endl;
+        sym_t max = 0;
+        
+        etext.reserve(local_num);
+        input.process_local([&](const sym_t x){
+            max = std::max(x, max);
+            etext.push_back(x);
+        }, rdbufsize);
 
-    // Compute effective alphabet
-    EffectiveAlphabet<sym_t> ea(hist);
+        // Create dummy histogram instance
+        hist = std::make_unique<DummyHistogram<sym_t>>(max);
 
-    // Transform text and cache in RAM
-    ctx.cout_master() << "Compute effective transformation ..." << std::endl;
-    std::vector<sym_t> etext(local_num);
-    {
-        size_t i = 0;
-        ea.transform(input, [&](sym_t x){ etext[i++] = x; }, rdbufsize);
+        // Update timer
+        time.eff = dt();
+    } else {
+        // Compute histogram
+        ctx.cout_master() << "Compute histogram ..." << std::endl;
+        hist = std::make_unique<Histogram<sym_t>>(ctx, input, rdbufsize);
+
+        time.hist = dt();
+
+        // Compute effective alphabet
+        EffectiveAlphabet<sym_t> ea(*hist);
+
+        // Transform text and cache in RAM
+        ctx.cout_master() << "Compute effective transformation ..." << std::endl;
+        etext.resize(local_num);
+        {
+            size_t i = 0;
+            ea.transform(input, [&](sym_t x){ etext[i++] = x; }, rdbufsize);
+        }
+
+        time.eff = dt();
     }
 
-    time.eff = dt();
-
     // Build wavelet matrix
-    auto wm = WaveletMatrix(hist,
+    auto wm = WaveletMatrix(*hist,
     [&](WaveletMatrix::bits_t& bits, WaveletMatrix::z_t& z, const WaveletMatrixBase& wm){
 
         const size_t height = wm.height();
@@ -350,7 +390,7 @@ static void start(
         ctx.cout_master() << "Writing WT to disk ..." << std::endl;
 
         if(ctx.rank() == 0) {
-            hist.save(output + "." + WaveletMatrixBase::histogram_extension());
+            hist->save(output + "." + WaveletMatrixBase::histogram_extension());
             wm.save_z(output + "." + WaveletMatrixBase::z_extension());
         }
 

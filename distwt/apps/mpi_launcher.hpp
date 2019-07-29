@@ -25,6 +25,10 @@ int mpi_launch(int argc, char** argv) {
     size_t sym_width = 1;
     cp.add_bytes('w', "width", sym_width, "Number of bytes per input symbol.");
 
+    bool eff_input = false;
+    cp.add_flag('e', "effective", eff_input,
+        "Input is already an effective transform (skip histogram computation).");
+
     std::string input_filename; // required
     cp.add_param_string("file", input_filename, "The input file.");
     if (!cp.process(argc, argv)) {
@@ -38,22 +42,30 @@ int mpi_launch(int argc, char** argv) {
     switch(sym_width) {
         case 1:
             mpi_app_t::template start<uint8_t>(
-                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+                ctx,
+                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                output);
             return 0;
 
         case 2:
             mpi_app_t::template start<uint16_t>(
-                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+                ctx,
+                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                output);
             return 0;
 
         case 4:
             mpi_app_t::template start<uint32_t>(
-                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+                ctx,
+                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                output);
             return 0;
 
         case 5:
             mpi_app_t::template start<uint40_t>(
-                ctx, input_filename, prefix, rdbufsize, local_filename, output);
+                ctx,
+                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                output);
             return 0;
 
         default:

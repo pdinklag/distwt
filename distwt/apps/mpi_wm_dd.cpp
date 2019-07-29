@@ -27,6 +27,7 @@ static void start(
     const size_t prefix,
     const size_t in_rdbufsize,
     const std::string& local_filename,
+    const bool eff_input,
     const std::string& output) {
 
     Result::Time time;

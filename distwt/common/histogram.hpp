@@ -89,7 +89,7 @@ public:
     }
 
     // amount of histogram entries
-    inline size_t size() const {
+    inline virtual size_t size() const {
         return m_entries.size();
     }
 

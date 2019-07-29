@@ -14,7 +14,8 @@
 template<typename sym_t>
 class Histogram : public HistogramBase<sym_t, idx_t> {
 public:
-    using HistogramBase<sym_t, idx_t>::HistogramBase;
+    inline Histogram() {
+    }
 
     inline Histogram(
         MPIContext& ctx,
