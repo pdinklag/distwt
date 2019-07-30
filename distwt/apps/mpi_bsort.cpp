@@ -109,7 +109,12 @@ static void start(
                 // free unneeded memory on last level
                 buffer.clear();
                 buffer.shrink_to_fit();
+                
                 bucket_sizes.shrink_to_fit();
+                msg_headers.shrink_to_fit();
+                
+                node_sizes.clear();
+                node_sizes.shrink_to_fit();
             }
 
             // construct bit vector
