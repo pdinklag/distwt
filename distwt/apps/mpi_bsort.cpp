@@ -93,8 +93,9 @@ static void start(
         ctx.synchronize();
         #endif
 
-        std::vector<std::vector<sym_t>> buckets;
+        std::vector<sym_t> buffer(local_num);
         std::vector<idx_t> bucket_sizes;
+        auto& bucket_pos = bucket_sizes; // alternative name to keep code readable
 
         std::vector<uint64_t*> msg_headers;
         for(size_t level = 0; level < height; level++) {
@@ -103,6 +104,13 @@ static void start(
 
             const size_t num_nlevel_nodes = 1ULL << (level+1);
             const size_t first_nlevel_node = num_nlevel_nodes;
+
+            if(level+1 == height) {
+                // free unneeded memory on last level
+                buffer.clear();
+                buffer.shrink_to_fit();
+                bucket_sizes.shrink_to_fit();
+            }
 
             // construct bit vector
             auto& level_bits = bits[level];
@@ -115,45 +123,60 @@ static void start(
                     level_bits[i] = bool((etext[i] >> rsh) & 1);
                 }
             } else { // if level+1 < height
-                // while building the bit vector, also fill the sort buckets
-                bucket_sizes.resize(num_nlevel_nodes);
+                // build bit and also fill the sort buckets
+                bucket_sizes.resize(num_nlevel_nodes + 1); // one extra helper entry
 
-                // scan 1 - compute bucket sizes
+                // scan 1 - precompute bucket sizes
                 for(size_t i = 0; i < local_num; i++) {
                     const sym_t x = etext[i];
-                    const size_t k = x >> rsh;
-                    assert(k < num_nlevel_nodes);
-                    ++bucket_sizes[k];
+                    const size_t v = x >> rsh;
+                    assert(v < num_nlevel_nodes);
+                    ++bucket_sizes[v];
                 }
 
-                // scan 2 - fill buckets
-                buckets.resize(num_nlevel_nodes);
-                for(size_t k = 0; k < num_nlevel_nodes; k++) {
-                    buckets[k].reserve(bucket_sizes[k]);
-                }
+                // compute bucket size (exclusive) prefix sums
+                std::vector<idx_t> bucket_offs = bucket_sizes;
+                ctx.ex_scan(bucket_offs);
 
+                // locally exclusively prefix sum sizes to act as write positions
+                {
+                    idx_t local_offs = 0;
+                    for(size_t v = 0; v < num_nlevel_nodes; v++) {
+                        const idx_t sz = bucket_pos[v];
+                        bucket_pos[v] = local_offs;
+                        local_offs += sz;
+                    }
+
+                    assert(local_offs == idx_t(local_num));
+                    bucket_pos[num_nlevel_nodes] = local_num; // helper entry
+                }
+                
+                // scan 2 - fill buckets and write bit vector
                 for(size_t i = 0; i < local_num; i++) {
                     const sym_t x = etext[i];
-                    const size_t k = x >> rsh;
-                    level_bits[i] = bool(k & 1);
-                    buckets[k].push_back(x);
+                    const size_t v = x >> rsh;
+                    level_bits[i] = bool(v & 1);
+                    buffer[bucket_pos[v]] = x;
+                    ++bucket_pos[v];
                 }
+
+                assert(bucket_pos[num_nlevel_nodes-1] == idx_t(local_num));
+
+                // revert bucket pos writes by shifting
+                for(size_t v = num_nlevel_nodes - 1; v > 0; v--) {
+                    bucket_pos[v] = bucket_pos[v-1];
+                }
+                bucket_pos[0] = 0;
 
                 // distribute buckets
                 // -> using locality to apply merge directly unlike after DD!
                 // -> this corresponds to bucket sort with < sigma keys
 
-                // compute bucket size prefix sums
-                std::vector<idx_t> bucket_offs(num_nlevel_nodes);
-                for(size_t v = 0; v < num_nlevel_nodes; v++) {
-                    bucket_offs[v] = idx_t(buckets[v].size());
-                }
-                ctx.ex_scan(bucket_offs);
-
                 // send buckets away
                 size_t glob_node_offs = 0;
                 for(size_t v = 0; v < num_nlevel_nodes; v++) {
-                  if(buckets[v].size() > 0) {
+                  const size_t bsz = bucket_pos[v+1] - bucket_pos[v];
+                  if(bsz > 0) {
 
                     const size_t glob_bucket_offs =
                         glob_node_offs + bucket_offs[v];
@@ -172,7 +195,7 @@ static void start(
 
                     // target of last bucket item
                     const size_t glob_last =
-                        glob_bucket_offs + buckets[v].size() - 1;
+                        glob_bucket_offs + bsz - 1;
                     const size_t target2 =
                         glob_last / input.size_per_worker();
 
@@ -191,15 +214,15 @@ static void start(
                         // send one message
                         auto header = new uint64_t[2];
                         header[0] = glob_bucket_offs;
-                        header[1] = buckets[v].size();
+                        header[1] = bsz;
                         msg_headers.push_back(header);
 
                         ctx.isend(header, 2, target, tag);
-                        ctx.isend(buckets[v], target, tag);
+                        ctx.isend(buffer.data() + bucket_pos[v], bsz, target, tag);
 
                         #ifdef DBG_BSORT
                         ctx.cout()
-                            << "(single) send " << buckets[v].size() << " at "
+                            << "(single) send " << bsz << " at "
                             << glob_bucket_offs << " (local 0)"
                             << " to " << target
                             << std::endl;
@@ -232,7 +255,7 @@ static void start(
                             #endif
 
                             ctx.isend(header1, 2, target1, tag);
-                            ctx.isend(buckets[v].data(), size1, target1, tag);
+                            ctx.isend(buffer.data() + bucket_pos[v], size1, target1, tag);
                         }
 
                         // message to second
@@ -243,8 +266,7 @@ static void start(
                             msg_headers.push_back(header2);
 
                             ctx.isend(header2, 2, target2, tag);
-                            ctx.isend(
-                                buckets[v].data() + size1, size2, target2, tag);
+                            ctx.isend(buffer.data() + bucket_pos[v] + size1, size2, target2, tag);
 
                             #ifdef DBG_BSORT
                             ctx.cout()
@@ -315,7 +337,6 @@ static void start(
                 ctx.synchronize();
 
                 // clean up
-                buckets.clear();
                 bucket_sizes.clear();
 
                 for(auto header : msg_headers) {
