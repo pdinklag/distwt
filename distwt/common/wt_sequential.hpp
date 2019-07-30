@@ -25,7 +25,7 @@ inline void wt_pc(
     const size_t n = text.size();
     const size_t sigma = 1ULL << h; // we need the next power of two!
 
-    assert(h > 1);
+    assert(h >= 1);
 
     // compute histogram and root node
     std::vector<idx_t> hist(sigma);
