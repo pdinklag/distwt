@@ -33,6 +33,15 @@ public:
 
         const size_t w = sizeof(sym_t);
         const size_t filesize = util::file_size(m_filename);
+        const size_t mod = filesize % w;
+
+        if(mod) {
+            ctx.cout_master() << "Chopping off " << mod
+                << " bytes from input file to fit symbols of width " << w
+                << " (" << filesize << " % " << w << " = " << mod << ")"
+                << std::endl;
+        }
+        
         m_total_size = std::min(filesize / w, prefix / w);
         m_size_per_worker = tlx::div_ceil(m_total_size, size_t(ctx.num_workers()));
 
