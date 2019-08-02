@@ -143,8 +143,11 @@ int main(int argc, const char** argv) {
 
         // store to disk if needed
         if(output_filename.length() > 0) {
-            hist.save(output_filename + "." +
-                WaveletTreeBase::histogram_extension());
+            if(ctx.my_rank() == 0) {
+                hist.save(output_filename + "." +
+                    WaveletTreeBase::histogram_extension());
+            }
+
             wt.save(output_filename);
         }
 

@@ -1,17 +1,19 @@
 #include <iostream>
-#include <tuple>
+#include <utility>
 
 #include <tlx/cmdline_parser.hpp>
+#include <tlx/math/div_ceil.hpp>
 
 #include <thrill/api/dia.hpp>
 
 #include <thrill/api/cache.hpp>
 #include <thrill/api/collapse.hpp>
+#include <thrill/api/concat.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/print.hpp>
 #include <thrill/api/read_binary.hpp>
 #include <thrill/api/size.hpp>
-#include <thrill/api/sort.hpp>
+#include <thrill/api/sum.hpp>
 #include <thrill/api/window.hpp>
 #include <distwt/thrill/force.hpp>
 
@@ -21,7 +23,8 @@
 #include <distwt/thrill/text.hpp>
 #include <distwt/thrill/histogram.hpp>
 #include <distwt/thrill/effective_alphabet.hpp>
-#include <distwt/thrill/wt_levelwise.hpp>
+#include <distwt/thrill/sym_pack.hpp>
+#include <distwt/thrill/wm.hpp>
 
 #include <thrill/common/stats_timer.hpp>
 #include <distwt/thrill/result.hpp>
@@ -80,10 +83,14 @@ int main(int argc, const char** argv) {
         time.eff = timer.SecondsDouble();
         timer.Reset();
 
-        // construct wt
-        WaveletTreeLevelwise wt(hist,
-        [&](WaveletTree::bits_t& bits, const WaveletTreeBase& wt){
-            const size_t height = wt.height();
+        // construct wm
+        WaveletMatrix wm(hist,
+        [&](WaveletMatrix::bits_t& bits,
+            WaveletMatrix::z_t& z,
+            const WaveletMatrixBase& wm) {
+
+            const size_t height = wm.height();
+
             bits.resize(height);
 
             auto text = etext.Collapse();
@@ -92,7 +99,7 @@ int main(int argc, const char** argv) {
 
                 // compute and store BV
                 bits[level] = text.Keep().Window(thrill::api::DisjointTag, 64,
-                    [rsh](size_t, const std::vector<sym_t>& v) {
+                    [rsh](size_t, const std::vector<sym_t>& v){
                         bv64_t bv;
                         for(size_t i = 0; i < v.size(); i++) {
                             // check level-th bit of symbol
@@ -104,17 +111,32 @@ int main(int argc, const char** argv) {
                     })
                     .Cache();
 
+                // compute Z ... NOT doable during winow
+                const size_t num1 = bits[level].Keep()
+                    .Map([](const bv64_t& bv){return bv.count();})
+                    .Sum([](const size_t a, const size_t b){return a + b;});
+                const size_t num0 = input_size - num1;
+                z[level] = num0;
+
+                // stable bucket sort of text
                 if(level+1 < height) {
-                    text = text.SortStable(
-                        [rsh](sym_t a, sym_t b){
-                            // stably sort according to newest bit
-                            return (a >> rsh) < (b >> rsh);
-                        }).Collapse();
+                    // create and fill buckets
+                    std::array<thrill::DIA<sym_t>, 2> buckets;
+
+                    for(size_t b = 0; b < 2; b++) {
+                        buckets[b] = (b == 1 ? text : text.Keep())
+                        .Filter([rsh,b](sym_t x){
+                            return (((x >> rsh) & 1) == b);
+                        });
+                    }
+
+                    // concatenate buckets
+                    text = thrill::api::Concat(buckets[0], buckets[1]);
                 }
             }
         });
 
-        wt.ensure();
+        wm.ensure();
 
         time.construct = timer.SecondsDouble();
         time.merge = 0; // no merging needed!
@@ -123,15 +145,17 @@ int main(int argc, const char** argv) {
         if(output_filename.length() > 0) {
             if(ctx.my_rank() == 0) {
                 hist.save(output_filename + "." +
-                    WaveletTreeBase::histogram_extension());
+                    WaveletMatrixBase::histogram_extension());
+                wm.save_z(output_filename  + "." +
+                    WaveletMatrixBase::z_extension());
             }
 
-            wt.save(output_filename);
+            wm.save(output_filename);
         }
 
         // gather stats
         timer.Stop();
-        Result result("thrill-sort",
+        Result result("thrill-wm-concat",
             ctx, input_filename, input_size, hist.size(), time);
 
         if(ctx.my_rank() == 0) {

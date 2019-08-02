@@ -30,6 +30,10 @@ target_link_libraries(thrill-bsort ${THRILL_APP_DEPENDENCIES})
 add_executable(thrill-dd thrill_dd.cpp)
 target_link_libraries(thrill-dd ${THRILL_APP_DEPENDENCIES})
 
+# Thrill WM Concat
+add_executable(thrill-wm-concat thrill_wm_concat.cpp)
+target_link_libraries(thrill-wm-concat ${THRILL_APP_DEPENDENCIES})
+
 # Thrill Input Benchmark
 add_executable(thrill-input thrill_input.cpp)
 target_link_libraries(thrill-input ${THRILL_APP_DEPENDENCIES})
