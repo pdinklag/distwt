@@ -18,6 +18,10 @@ target_link_libraries(mpi-wm-concat ${MPI_APP_DEPENDENCIES})
 add_executable(mpi-wm-dd mpi_wm_dd.cpp)
 target_link_libraries(mpi-wm-dd ${MPI_APP_DEPENDENCIES})
 
+# MPI WM Split
+add_executable(mpi-wm-dsplit mpi_wm_dsplit.cpp)
+target_link_libraries(mpi-wm-dsplit ${MPI_APP_DEPENDENCIES})
+
 # Thrill Sort
 add_executable(thrill-sort thrill_sort.cpp)
 target_link_libraries(thrill-sort ${THRILL_APP_DEPENDENCIES})
