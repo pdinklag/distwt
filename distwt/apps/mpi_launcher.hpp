@@ -13,9 +13,6 @@ int mpi_launch(int argc, char** argv) {
     size_t rdbufsize = 0; // default to local input size
     cp.add_bytes('r', "rbuf", rdbufsize, "File read buffer size.");
 
-    std::string local_filename("");
-    cp.add_string('l', "local", local_filename, "Name of local part file.");
-
     std::string output("");
     cp.add_string('o', "output", output, "Name of output file.");
 
@@ -43,28 +40,28 @@ int mpi_launch(int argc, char** argv) {
         case 1:
             mpi_app_t::template start<uint8_t>(
                 ctx,
-                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                input_filename, prefix, rdbufsize, eff_input,
                 output);
             return 0;
 
         case 2:
             mpi_app_t::template start<uint16_t>(
                 ctx,
-                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                input_filename, prefix, rdbufsize, eff_input,
                 output);
             return 0;
 
         case 4:
             mpi_app_t::template start<uint32_t>(
                 ctx,
-                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                input_filename, prefix, rdbufsize, eff_input,
                 output);
             return 0;
 
         case 5:
             mpi_app_t::template start<uint40_t>(
                 ctx,
-                input_filename, prefix, rdbufsize, local_filename, eff_input,
+                input_filename, prefix, rdbufsize, eff_input,
                 output);
             return 0;
 

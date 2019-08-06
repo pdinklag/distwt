@@ -25,7 +25,6 @@ static void start(
     const std::string& input_filename,
     const size_t prefix,
     const size_t in_rdbufsize,
-    const std::string& local_filename,
     const bool eff_input,
     const std::string& output) {
 
@@ -43,19 +42,8 @@ static void start(
     FilePartitionReader<sym_t> input(ctx, input_filename, prefix);
     const size_t local_num = input.local_num();
     const size_t rdbufsize = (in_rdbufsize > 0) ? in_rdbufsize : local_num;
-
-    if(local_filename.length() > 0) {
-        // Extract local part
-        ctx.cout_master() << "Extract partition to "
-            << local_filename << " ..." << std::endl;
-
-        input.extract_local(local_filename, rdbufsize);
-
-        // Synchronize
-        ctx.cout_master() << "Synchronizing ..." << std::endl;
-        ctx.synchronize();
-    }
-
+    input.buffer(rdbufsize);
+    
     time.input = dt();
 
     // Compute histogram
@@ -76,6 +64,7 @@ static void start(
     }
 
     time.eff = dt();
+    input.free();
 
     // recursive WT
     ctx.cout_master() << "Compute local WTs ..." << std::endl;
