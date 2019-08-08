@@ -120,18 +120,17 @@ int main(int argc, const char** argv) {
 
                 // stable bucket sort of text
                 if(level+1 < height) {
-                    // create and fill buckets
-                    std::array<thrill::DIA<sym_t>, 2> buckets;
+                    // create buckets
+                    auto bucket0 = text.Filter([rsh](sym_t x){
+                        return (((x >> rsh) & 1) == 0);
+                    });
 
-                    for(size_t b = 0; b < 2; b++) {
-                        buckets[b] = (b == 1 ? text : text.Keep())
-                        .Filter([rsh,b](sym_t x){
-                            return (((x >> rsh) & 1) == b);
-                        });
-                    }
+                    auto bucket1 = text.Filter([rsh](sym_t x){
+                        return (((x >> rsh) & 1) == 1);
+                    });
 
                     // concatenate buckets
-                    text = thrill::api::Concat(buckets[0], buckets[1]);
+                    text = thrill::api::Concat(bucket0, bucket1);
                 }
             }
         });
