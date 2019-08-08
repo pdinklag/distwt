@@ -10,6 +10,10 @@ target_link_libraries(mpi-dsplit ${MPI_APP_DEPENDENCIES})
 add_executable(mpi-bsort mpi_bsort.cpp)
 target_link_libraries(mpi-bsort ${MPI_APP_DEPENDENCIES})
 
+# MPI Bucket Sort with dynamic bucket allocation
+add_executable(mpi-dynbsort mpi_dynbsort.cpp)
+target_link_libraries(mpi-dynbsort ${MPI_APP_DEPENDENCIES})
+
 # MPI WM Concat
 add_executable(mpi-wm-concat mpi_wm_concat.cpp)
 target_link_libraries(mpi-wm-concat ${MPI_APP_DEPENDENCIES})
