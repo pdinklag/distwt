@@ -21,6 +21,8 @@ struct ThrillStats {
     }
 };
 
+#include <distwt/thrill/not_yet_templated.hpp>
+
 Result::Result(
     const std::string& algo,
     thrill::Context& ctx,
@@ -34,6 +36,7 @@ Result::Result(
     m_workers_per_node = ctx.workers_per_host();
     m_input = input_filename;
     m_size = input_size;
+    m_bytes_per_symbol = sizeof(sym_t);
     m_alphabet = alphabet;
     m_time = time;
 

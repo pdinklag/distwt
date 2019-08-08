@@ -22,6 +22,7 @@ public:
         m_workers_per_node = ctx.num_workers_per_node();
         m_input = input.filename();
         m_size = input.total_size();
+        m_bytes_per_symbol = sizeof(sym_t);
         m_alphabet = alphabet;
         m_time = time;
 

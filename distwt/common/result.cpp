@@ -11,6 +11,7 @@ std::string ResultBase::sqlplot() const {
     oss << " workers_per_node=" << m_workers_per_node;
     oss << " input=" << m_input;
     oss << " size=" << m_size;
+    oss << " bps=" << m_bytes_per_symbol;
     oss << " alphabet=" << m_alphabet;
     oss << " time_input=" << m_time.input;
     oss << " time_hist=" << m_time.hist;

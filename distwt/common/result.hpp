@@ -22,6 +22,7 @@ protected:
     size_t m_workers_per_node;
     std::string m_input;
     size_t m_size;
+    size_t m_bytes_per_symbol;
     size_t m_alphabet;
     Time   m_time;
     size_t m_memory;
