@@ -329,7 +329,7 @@ static void start(
     ctx.synchronize();
 
     // gather stats
-    Result result("mpi-bsort", ctx, input, wt.sigma(), time);
+    Result result("mpi-dynbsort", ctx, input, wt.sigma(), time);
 
     ctx.cout_master() << result.readable() << std::endl
                       << result.sqlplot() << std::endl;
