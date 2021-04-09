@@ -4,9 +4,17 @@ This repository contains the code I wrote in the scope of my master's thesis on 
 It is split up into two *worlds*: the Thrill world contains algorithms based on the [Thrill framework](http://project-thrill.org/), the MPI world is based on MPI. While Thrill allows for swift high-level sketching of algorithms which almost immediately works in practice, you will find a lot more low-level yada in the MPI part which may be useful for other projects, too (e.g. the parallel split operation).
 
 ## Building
-The only hard dependencies are Thrill and MPI.
+The project is built like a typical CMake project:
+```
+mkdir build && cd build
+cmake ..
+make
+```
 
-Pass `-DTHRILL_ROOT_DIR=<path/to/thrill>` to CMake pointing to a fully built clone of the [Thrill repository](https://github.com/thrill/thrill).
+### Dependencies
+The only hard external dependency is MPI. The project also uses [tlx](https://github.com/tlx/tlx), which is embedded as a git submodule that is automatically initialized via CMake.
+
+Thrill binaries will only be built if Thrill is available. Pass `-DTHRILL_ROOT_DIR=<path/to/thrill>` to CMake pointing to a fully built clone of the [Thrill repository](https://github.com/thrill/thrill).
 
 ## Algorithms and Helpers
 Here's a quick roundup of the generated binaries.
