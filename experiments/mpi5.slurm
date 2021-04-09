@@ -9,11 +9,6 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --constraint=cstd01
 
-export WORK=/work/$USER
-export HOME=/home/$USER
-export JOB_WD=work-$SLURM_JOB_ID
-export WD=/scratch/$JOB_WD
-
 echo $@
 echo
 
