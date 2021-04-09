@@ -19,10 +19,17 @@ else()
     message(FATAL_ERROR "Unsupported CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 endif()
 
-# Required
+# init submodules
+include(InitSubmodules)
+
+# tlx
+set(TDC_EXTLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extlib")
+add_subdirectory(${TDC_EXTLIB_SOURCE_DIR}/tlx)
+include_directories(${TDC_EXTLIB_SOURCE_DIR}/tlx)
+
+# required
 find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
-find_package(TLX REQUIRED)
 
 # Thrill related (optional)
 find_package(ZLIB)
@@ -31,7 +38,6 @@ find_package(FOXXL)
 find_package(Thrill)
 
 include_directories(${MPI_INCLUDE_PATH})
-include_directories(${TLX_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 if(THRILL_FOUND)

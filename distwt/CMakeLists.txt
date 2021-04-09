@@ -2,11 +2,11 @@
 add_subdirectory(tools)
 
 # distwt-common
-set(COMMON_DEPENDENCIES ${TLX_LIBRARIES})
+set(COMMON_DEPENDENCIES tlx)
 add_subdirectory(common)
 
 # distwt-mpi
-set(MPI_DEPENDENCIES distwt-common ${MPI_LIBRARIES} ${TLX_LIBRARIES})
+set(MPI_DEPENDENCIES distwt-common ${MPI_LIBRARIES} tlx)
 add_subdirectory(mpi)
 
 # distwt-thrill
@@ -15,7 +15,7 @@ if(THRILL_FOUND)
         distwt-common
         ${THRILL_LIBRARIES}
         ${FOXXL_LIBRARIES}
-        ${TLX_LIBRARIES}
+        tlx
         ${ZLIB_LIBRARIES}
         ${BZIP2_LIBRARIES}
         ${MPI_LIBRARIES}
