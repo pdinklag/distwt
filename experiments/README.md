@@ -12,7 +12,7 @@ The following system-specific configuration is required:
 
 * At the beginning of `schedule.sh`, change the `WORK` and `BIN` variables as needed. Note that these must contain absolute paths in case you are using Slurm.
 * Further down, you may also need to configure the `DATASETS` variable to contain the path to the input datasets. The input files and further properties for the experiments are determined right below.
-* When using Slurm, in `mpi5.slurm`, you may need to adapt the `#SBATCH` configuration lines to your enviroment. Ensure that `--ntasks-per-node` contains exactly the number of cores per node in order to use them maximally, `--cpus-per-task` should remain at one. The `--nodes` settings is simply a template will be overridden by the script described below.
+* When using Slurm, in `mpi5.slurm`, you may need to adapt the `#SBATCH` configuration lines to your enviroment. Ensure that `--ntasks-per-node` contains exactly the number of cores per node in order to use them maximally, `--cpus-per-task` should remain at one. The `--nodes` setting is simply a template that will be overridden by the script described below.
 
 ## Running
 
@@ -59,7 +59,7 @@ Note that the `time` values should be interpreted as actual wall clock times, *n
 
 For the publications, the raw data was entered into an SQL database (via [sqlplot-tools](https://github.com/bingmann/sqlplot-tools)) and queried as follows, grouping the result lines by the algorithm (`algo`) for computing medians or averages.
 
-* *Throughputs* are computed according by dividing the output size in bits (*n lg σ*) by the time needed for histogram computation, wavelet tree construction and merging, followed by a downscaling to *Gibit/s*:
+* *Throughputs* are computed by dividing the output size in bits (*n lg σ*) by the time needed for histogram computation, wavelet tree construction and merging, followed by a downscaling to *Gibit/s*:
 
   ```
   ((size*CEIL(LOG(alphabet)/LOG(2)))/MEDIAN(time_construct+time_merge+time_hist))/(1024.0*1024.0*1024.0)
