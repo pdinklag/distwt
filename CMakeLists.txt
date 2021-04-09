@@ -19,19 +19,25 @@ else()
     message(FATAL_ERROR "Unsupported CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 endif()
 
+# Required
 find_package(Threads REQUIRED)
-find_package(ZLIB REQUIRED)
-find_package(BZip2 REQUIRED)
 find_package(MPI REQUIRED)
 find_package(TLX REQUIRED)
-find_package(FOXXL REQUIRED)
-find_package(Thrill REQUIRED)
+
+# Thrill related (optional)
+find_package(ZLIB)
+find_package(BZip2)
+find_package(FOXXL)
+find_package(Thrill)
 
 include_directories(${MPI_INCLUDE_PATH})
 include_directories(${TLX_INCLUDE_DIRS})
-include_directories(${FOXXL_INCLUDE_DIRS})
-include_directories(${THRILL_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+if(THRILL_FOUND)
+    include_directories(${FOXXL_INCLUDE_DIRS})
+    include_directories(${THRILL_INCLUDE_DIRS})
+endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_subdirectory(distwt)
